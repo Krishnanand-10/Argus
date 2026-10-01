@@ -304,8 +304,8 @@ Argus/
 
 - [x] **Phase 1: Architecture & Design Specification**
   - [x] Architectural documentation & binary format specification
-  - [ ] Character normalization & Unicode word tokenizer
-  - [ ] Porter Stemming algorithm & stopword filter
+  - [x] Character normalization & Unicode word tokenizer
+  - [x] Porter Stemming algorithm & stopword filter
 - [ ] **Phase 2: Inverted Index & Positional Postings**
   - [ ] Term Dictionary (Trie / Radix Tree)
   - [ ] Positional postings list with Term Frequency and offsets
