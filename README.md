@@ -26,42 +26,66 @@
 
 ## 📐 System Architecture
 
+Argus decouples the **Ingestion & Indexing Pipeline (Write Path)** from the **Query Execution & Ranking Pipeline (Read Path)**:
+
 ```mermaid
-flowchart TD
-    subgraph Ingestion ["1. Document Ingestion Pipeline"]
-        D1["Raw Documents<br/>(JSON, Markdown, TXT)"]
-        D2["Document Registry & Monotonic DocID Allocator"]
-        D1 --> D2
+flowchart TB
+    %% Ingestion / Write Path
+    subgraph Ingestion ["📥 Ingestion & Indexing Pipeline (Write Path)"]
+        direction TB
+        Docs["📄 Raw Documents<br/>(JSON, Markdown, Plaintext)"]
+        
+        subgraph Analyzer ["src/analyzer — Text Analysis Pipeline"]
+            Norm["Unicode Normalizer<br/>(NFKD Decomposition)"]
+            Token["Unicode Word Tokenizer<br/>(Word Boundary Scanner)"]
+            Stop["Stopword Eliminator<br/>(~170 Standard English Words)"]
+            Stem["Porter Stemmer<br/>(Morphological Normalization)"]
+            Norm --> Token --> Stop --> Stem
+        end
+
+        subgraph Storage ["src/index & src/storage — Storage Engine"]
+            Lexicon["Lexicon Dictionary<br/>(Radix Tree & Term Offsets)"]
+            Postings["Positional Postings Lists<br/>[DocID, Term Frequency, Offsets]"]
+            Codec["VByte & Delta (D-Gap) Compressor"]
+            DiskFile[("💾 .argus Binary Index<br/>(Zero-Copy Disk Format)")]
+            
+            Lexicon --> Postings --> Codec --> DiskFile
+        end
+
+        Docs --> Norm
+        Stem --> Lexicon
     end
 
-    subgraph Analyzer ["2. Text Analysis Pipeline (src/analyzer)"]
-        A1["Character Filter<br/>(Unicode NFKD Normalization)"]
-        A2["Unicode Word Tokenizer"]
-        A3["Stopword Eliminator (~170 Standard Words)"]
-        A4["Porter Stemming Algorithm"]
-        A1 --> A2 --> A3 --> A4
+    %% Query / Read Path
+    subgraph QueryPath ["🔍 Query & Retrieval Engine (Read Path)"]
+        direction TB
+        UserQuery["🔎 User Search Query<br/>(distributed AND consensus NOT byzantine)"]
+        
+        subgraph Parser ["src/query — AST Query Parser"]
+            QLex["Query Lexer & Tokenizer"]
+            QAST["Recursive-Descent AST Parser<br/>(Boolean, Exact Phrases, Wildcards)"]
+            QLex --> QAST
+        end
+
+        subgraph Scoring ["src/ranking — Retrieval & Ranking"]
+            SkipIntersector["Skip-List Intersection<br/>& Positional Phrase Verifier"]
+            BM25["Okapi BM25 Scorer<br/>(k1 = 1.2, b = 0.75, Robertson IDF)"]
+            WAND["WAND Dynamic Pruning<br/>(Skip Non-Competitive Docs)"]
+            TopK["MinHeap Priority Queue<br/>(Top-K Collection)"]
+            
+            SkipIntersector --> BM25 --> WAND --> TopK
+        end
+
+        Results["🏆 Ranked Search Results<br/>(DocIDs, Scores, Snippets & Highlights)"]
+
+        UserQuery --> QLex
+        QAST --> SkipIntersector
+        TopK --> Results
     end
 
-    subgraph Indexing ["3. Indexing & Storage Engine (src/index & src/storage)"]
-        I1["Lexicon Radix Tree / Trie Dictionary"]
-        I2["Positional Postings Lists<br/>[DocID, TF, Positions...]"]
-        I3["Delta (D-Gap) & Variable-Byte (Varint) Encoder"]
-        I4["Custom .argus Binary Disk File"]
-        I1 --- I2 --> I3 --> I4
-    end
-
-    subgraph QueryEngine ["4. Query & Ranking Engine (src/query & src/ranking)"]
-        Q1["User Query: term AND 'exact phrase' -negated"]
-        Q2["Lexer & Recursive-Descent AST Parser"]
-        Q3["Skip-List Intersections & Positional Verifier"]
-        Q4["Okapi BM25 Scorer (k1 = 1.2, b = 0.75)"]
-        Q5["MinHeap Top-K Priority Queue & Highlight Generator"]
-        Q1 --> Q2 --> Q3 --> Q4 --> Q5
-    end
-
-    D2 --> A1
-    A4 --> I1
-    I4 -. "Zero-Copy Disk Read" .-> Q3
+    %% Cross-Pipeline Connections
+    QAST -.->|1. Term Statistics Lookup| Lexicon
+    DiskFile -.->|2. Postings Stream / Memory Read| SkipIntersector
 ```
 
 ---
