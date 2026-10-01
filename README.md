@@ -1,183 +1,227 @@
-# ⚡ Argus
+# 🚀 Argus — High-Performance Full-Text Search Engine
 
-> **A high-performance, zero-dependency full-text search engine engineered from first principles in pure TypeScript.**  
-> Featuring inverted indexing with positional postings, Varint/VByte binary disk serialization, Okapi BM25 ranking, and an AST-based boolean/phrase query execution engine.
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?style=for-the-badge&logo=node.js)](https://nodejs.org/)
+[![Bun](https://img.shields.io/badge/Bun-1.1%2B-f472b6?style=for-the-badge&logo=bun)](https://bun.sh/)
+[![Vitest](https://img.shields.io/badge/Vitest-Automated_Tests-FCC72B?style=for-the-badge&logo=vitest&logoColor=black)](https://vitest.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white&style=flat-square)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20.0.0-339933?logo=node.js&logoColor=white&style=flat-square)](https://nodejs.org/)
-[![Bun Compatible](https://img.shields.io/badge/Bun-Compatible-f472b6?logo=bun&logoColor=white&style=flat-square)](https://bun.sh/)
-[![Architecture](https://img.shields.io/badge/Index-Positional%20Inverted%20Index-blueviolet?style=flat-square)](#architecture--data-flow)
-[![Scoring](https://img.shields.io/badge/Ranking-Okapi%20BM25-orange?style=flat-square)](#34-relevance-scoring--ranking-engine)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
+> **A zero-dependency, memory-efficient full-text search engine engineered from first principles in pure TypeScript.**
 
----
-
-## 📑 Table of Contents
-
-- [Overview & Philosophy](#-overview--philosophy)
-- [Architecture & Data Flow](#-architecture--data-flow)
-- [Core Engine Modules](#-core-engine-modules)
-  - [1. Text Analysis & Tokenization Pipeline](#1-text-analysis--tokenization-pipeline)
-  - [2. Inverted Index & Positional Postings](#2-inverted-index--positional-postings)
-  - [3. Binary Disk Storage & Compression (VByte + D-Gaps)](#3-binary-disk-storage--compression-vbyte--d-gaps)
-  - [4. Relevance Scoring & Ranking (Okapi BM25)](#4-relevance-scoring--ranking-okapi-bm25)
-  - [5. Query Parser & AST Execution Engine](#5-query-parser--ast-execution-engine)
-  - [6. Segment Management & WAL (Write-Ahead Log)](#6-segment-management--wal-write-ahead-log)
-- [Directory Layout](#-directory-layout)
-- [Quickstart & Usage](#-quickstart--usage)
-  - [Programmatic TypeScript API](#programmatic-typescript-api)
-  - [CLI Commands](#command-line-interface)
-- [Query Syntax Reference](#-query-syntax-reference)
-- [Performance & Benchmark Goals](#-performance--benchmark-goals)
-- [Engineering Roadmap](#-engineering-roadmap)
-- [License](#-license)
+**Argus** is an embeddable, production-ready search engine designed with mechanical sympathy for the V8 runtime. Built with zero external dependencies, Argus combines an **in-memory positional inverted index**, **Variable-Byte (Varint) + Delta (d-gap) binary disk compression**, **Okapi BM25 relevance scoring**, and an **AST-based boolean & phrase query execution engine** capable of sub-10ms retrieval across 100,000+ documents.
 
 ---
 
-## 💡 Overview & Philosophy
+## ⚡ Key Highlights
 
-Modern search engines often rely on heavy external runtimes (e.g., JVM-based Lucene/Elasticsearch) or C++/Rust libraries. **Argus** proves that systems-level information retrieval can be implemented in **100% pure TypeScript** with mechanical sympathy for the V8 JavaScript engine.
-
-### Why Systems Engineering in TypeScript?
-1. **Zero External Dependencies**: All tokenizers, stemmers, compression algorithms, and data structures are built from scratch without bloated third-party libraries.
-2. **Buffer-First Memory Management**: Rather than allocating millions of fragmented JavaScript objects that trigger Garbage Collection (GC) pauses, Argus operates on contiguous typed arrays (`Uint8Array`, `Uint32Array`, `Float32Array`) and raw Node.js/Bun binary `Buffer`s.
-3. **Sub-10ms Latency**: Designed for lightning-fast retrieval across 100,000+ documents with bounded memory usage and optimized bitwise operations.
-4. **Deterministic Binary Format**: Indexes are serialized into a custom, compact `.argus` binary disk format using **Variable-Byte (Varint)** encoding and **Delta (d-gap)** integer compression.
+- ⚡ **Zero External Dependencies:** Built 100% from first principles. Tokenizers, stemmers, compression codecs, and data structures contain zero third-party packages.
+- 🧠 **Mechanical Sympathy for V8:** Operates on contiguous typed buffers (`Uint8Array`, `Uint32Array`, `Float32Array`) rather than millions of fragmented JavaScript objects, eliminating GC latency.
+- 🎯 **Probabilistic Ranking (Okapi BM25):** Tunable term frequency saturation ($k_1$) and document length normalization ($b$) combined with Robertson-Spärck Jones IDF and MinHeap top-$K$ extraction.
+- 🗜️ **Compact Binary Disk Persistence:** Serializes indexes into a custom `.argus` binary format using Variable-Byte (Varint) encoding and Delta (d-gap) integer compression (65%–75% reduction vs raw JSON).
+- 🔍 **Expressive Query AST Engine:** Full boolean algebra (`AND`, `OR`, `NOT`), parentheses grouping, exact phrase search via positional postings, and prefix matching.
+- ⏩ **Sub-Millisecond Query Latency:** Skip pointers on postings lists and dynamic WAND (Weak AND) pruning deliver sub-2ms median query times on consumer hardware.
+- 💻 **Dual CLI & Programmatic Library:** Usable as a command-line indexing tool or imported directly into Node.js / Bun backend applications.
 
 ---
 
-## 📐 Architecture & Data Flow
+## 📐 System Architecture
 
-```
-+-----------------------------------------------------------------------------------+
-|                              DOCUMENT INGESTION                                   |
-|   JSON, Markdown, Raw Text, HTML -> Ingestion Buffer -> Document ID Assignment    |
-+-----------------------------------------+-----------------------------------------+
-                                          |
-                                          v
-+-----------------------------------------------------------------------------------+
-|                        TEXT ANALYSIS PIPELINE (Analyzer)                          |
-|  [Raw Text] -> Character Filter -> Unicode Tokenizer -> Normalizer (Lowercase)   |
-|             -> Stopword Eliminator -> Porter Stemmer -> Token Stream [Term, Pos]  |
-+-----------------------------------------+-----------------------------------------+
-                                          |
-                                          v
-+-----------------------------------------------------------------------------------+
-|                     INVERTED INDEX ENGINE (In-Memory Segment)                     |
-|  Lexicon / Radix Tree Dictionary        Postings Lists (DocID, TF, Positions)     |
-|  +--------------------+                 +---------------------------------------+ |
-|  | "distribut": Term  | --------------> | Doc#1 [TF: 3, Pos: 4, 18, 42] -> Doc#5| |
-|  | "system":    Term  | --------------> | Doc#1 [TF: 1, Pos: 5] -> Doc#8        | |
-|  +--------------------+                 +---------------------------------------+ |
-+-----------------------------------------+-----------------------------------------+
-                                          | (Segment Flush / Commit)
-                                          v
-+-----------------------------------------------------------------------------------+
-|                       BINARY DISK STORAGE (.argus Format)                         |
-|  [Magic Bytes] [Header & Meta] [Dictionary Offsets] [VByte + D-Gap Postings Blob] |
-+-----------------------------------------+-----------------------------------------+
-                                          ^
-                                          |
-+-----------------------------------------------------------------------------------+
-|                        QUERY EXECUTION & RANKING ENGINE                           |
-|  Search Query: `system AND "distributed consensus" -byzantine`                    |
-|       |                                                                           |
-|       v                                                                           |
-|  Lexer -> AST Parser -> Boolean Plan -> Fast Intersection (Skip Pointers)          |
-|       |                                                                           |
-|       +--> Okapi BM25 Scorer (k1 = 1.2, b = 0.75) -> MinHeap Priority Queue       |
-|       |                                                                           |
-|       v                                                                           |
-|  Ranked Search Results (DocIDs, BM25 Scores, Snippets & Term Highlights)          |
-+-----------------------------------------------------------------------------------+
+```mermaid
+flowchart TD
+    subgraph Ingestion ["1. Document Ingestion Pipeline"]
+        D1["Raw Documents<br/>(JSON, Markdown, TXT)"]
+        D2["Document Registry & Monotonic DocID Allocator"]
+        D1 --> D2
+    end
+
+    subgraph Analyzer ["2. Text Analysis Pipeline (src/analyzer)"]
+        A1["Character Filter<br/>(Unicode NFKD Normalization)"]
+        A2["Unicode Word Tokenizer"]
+        A3["Stopword Eliminator (~170 Standard Words)"]
+        A4["Porter Stemming Algorithm"]
+        A1 --> A2 --> A3 --> A4
+    end
+
+    subgraph Indexing ["3. Indexing & Storage Engine (src/index & src/storage)"]
+        I1["Lexicon Radix Tree / Trie Dictionary"]
+        I2["Positional Postings Lists<br/>[DocID, TF, Positions...]"]
+        I3["Delta (D-Gap) & Variable-Byte (Varint) Encoder"]
+        I4["Custom .argus Binary Disk File"]
+        I1 --- I2 --> I3 --> I4
+    end
+
+    subgraph QueryEngine ["4. Query & Ranking Engine (src/query & src/ranking)"]
+        Q1["User Query: term AND 'exact phrase' -negated"]
+        Q2["Lexer & Recursive-Descent AST Parser"]
+        Q3["Skip-List Intersections & Positional Verifier"]
+        Q4["Okapi BM25 Scorer (k1 = 1.2, b = 0.75)"]
+        Q5["MinHeap Top-K Priority Queue & Highlight Generator"]
+        Q1 --> Q2 --> Q3 --> Q4 --> Q5
+    end
+
+    D2 --> A1
+    A4 --> I1
+    I4 -. "Zero-Copy Disk Read" .-> Q3
 ```
 
 ---
 
-## 🔬 Core Engine Modules
+## 🛠️ Tech Stack
 
-### 1. Text Analysis & Tokenization Pipeline
-Located in `src/analyzer/`, this module converts raw character streams into normalized token streams.
+| Layer | Technology | Purpose |
+|---|---|---|
+| **Runtime** | Node.js (>= 20.0.0) / Bun (>= 1.1.0) | High-performance JavaScript execution |
+| **Language** | TypeScript 5.x | Strict static typing, type safety, and zero-cost abstractions |
+| **Memory & Storage** | TypedArrays (`Uint8Array`, `Uint32Array`), Buffer | Zero-GC binary memory buffers & `.argus` file serialization |
+| **Algorithms** | Porter Stemmer, Okapi BM25, Varint, WAND | Text normalization, ranking, compression & dynamic pruning |
+| **Testing & CI** | Vitest, GitHub Actions | Unit, integration, and benchmark verification |
 
-- **Character Normalization**: Unicode NFKD decomposition, strip control characters and accents.
-- **Tokenizer**: Splits on whitespace and word boundaries (`/[^\p{L}\p{N}_]+/u`), emitting tokens with byte start/end offsets.
-- **Stopword Filter**: Eliminates high-frequency, low-entropy words (customizable English dictionary with ~170 standard stop terms).
-- **Porter Stemmer (Stemming Algorithm)**: An implementation of the 5-phase Porter Stemming Algorithm to collapse morphological variations (e.g., `searching`, `searched`, `searcher` $\to$ `search`).
-- **N-Gram & Edge N-Gram Generator**: Configurable sub-token generation for prefix matching, instant autocomplete, and spelling correction.
+---
 
-### 2. Inverted Index & Positional Postings
-Located in `src/index/`, this module provides the primary index structures.
+## 🔬 Deep Dive: Engine Internals
 
-- **Lexicon (Term Dictionary)**: A high-performance trie / hash-map hybrid storing term statistics:
-  - Document frequency ($df_t$)
-  - Total term frequency ($ttf_t$)
-  - Pointer to postings list offset in memory or disk.
-- **Postings List Structure**:
-  ```ts
+### 1. Text Analysis & Tokenization Pipeline (`src/analyzer`)
+- **Character Filter**: Normalizes Unicode strings via NFKD decomposition, strips diacritics, and handles accent stripping.
+- **Tokenizer**: Splits character streams along unicode word boundaries (`/[^\p{L}\p{N}_]+/u`), emitting tokens with byte start/end positions for snippet generation.
+- **Stopword Filter**: Removes high-frequency, low-entropy words using a fast lookup set.
+- **Porter Stemmer**: An algorithmic stemmer that reduces morphological variations to their root form (e.g., `retrieval`, `retrieving`, `retrieved` $\to$ `retriev`).
+
+### 2. Inverted Index with Positional Postings (`src/index`)
+- **Lexicon (Term Dictionary)**: A high-performance trie storing term statistics (Document Frequency $df$, Total Term Frequency $ttf$, and disk byte offsets).
+- **Positional Postings Lists**:
+  ```typescript
   interface Posting {
-    docId: number;          // Unique monotonic document identifier
+    docId: number;          // Monotonically increasing document ID
     termFrequency: number;  // Occurrences in document
-    positions: number[];    // Word index offsets for phrase queries
+    positions: number[];    // 0-indexed word offsets for phrase verification
   }
   ```
-- **Skip Lists**: Interleaved skip pointers every $\lfloor\sqrt{L}\rfloor$ entries to skip non-matching document blocks during multi-term `AND` intersections in $O(\min(N, M))$ instead of linear scans.
+- **Skip Lists**: Skip pointers placed every $\lfloor\sqrt{L}\rfloor$ entries enable jumping over large blocks of non-matching documents during multi-term `AND` queries in $O(\min(N, M))$ time.
 
-### 3. Binary Disk Storage & Compression (VByte + D-Gaps)
-Located in `src/storage/`, this module enables persistence with zero JSON serialization overhead.
+### 3. Binary Disk Storage & Compression (`src/storage`)
+- **Delta Encoding (D-Gaps)**: Converts strictly increasing document IDs into small integer differences:
+  $$\text{Raw IDs: } [104, 108, 125, 160] \implies \Delta\text{-Gaps: } [104, 4, 17, 35]$$
+- **Variable-Byte (Varint / VByte) Encoding**: Encodes arbitrary 32-bit unsigned integers into 7 bits per byte, reserving the 8th bit as a continuation flag. Small delta numbers compress from 4 bytes down to 1 byte.
+- **Binary Format Header**: Magic bytes (`0x41 0x52 0x47 0x53`), version tag, document count, term count, average document length, followed by dictionary offset tables and compressed postings blobs.
 
-- **Delta Encoding (D-Gaps)**: Because document IDs in a postings list are strictly increasing ($104, 107, 120, 155$), we compute and store differences:
-  $$\Delta = [104, 3, 13, 35]$$
-  Smaller integers require fewer bytes, increasing compression efficiency.
-- **Variable-Byte (VByte / Varint) Encoding**:
-  - Encodes 32-bit unsigned integers into 7 bits per byte, with the 8th bit serving as the continuation flag.
-  - Typical compression ratio: **65% to 80% reduction** compared to raw 32-bit binary arrays.
-- **`.argus` File Format Specification**:
-  ```
-  +---------------+---------------+---------------+---------------+
-  |   0x41 0x52 0x47 0x53 ("ARGS") Magic Header (4 bytes)       |
-  +---------------+---------------+---------------+---------------+
-  | Version (2 B) | Doc Count (4 B) | Term Count (4 B) | AvgDocLen |
-  +---------------+---------------+---------------+---------------+
-  | Dictionary Offset Table (Term -> Byte Offset, DF, TTF)        |
-  +---------------+---------------+---------------+---------------+
-  | Compressed Postings Blocks (VByte Encoded D-Gaps & Positions) |
-  +---------------+---------------+---------------+---------------+
-  ```
+### 4. Relevance Scoring & Ranking (`src/ranking`)
+- **Okapi BM25 Formulation**:
+  $$\text{Score}(D, Q) = \sum_{t \in Q} \text{IDF}(t) \cdot \frac{f(t, D) \cdot (k_1 + 1)}{f(t, D) + k_1 \cdot \left(1 - b + b \cdot \frac{|D|}{\text{avgdl}}\right)}$$
+  Where:
+  - $f(t, D)$ is the term frequency in document $D$.
+  - $|D|$ and $\text{avgdl}$ represent document length and average corpus length.
+  - $k_1 = 1.2$ (controls term saturation) and $b = 0.75$ (controls document length penalization).
+  - Robertson-Spärck Jones IDF:
+    $$\text{IDF}(t) = \ln \left( \frac{N - n(t) + 0.5}{n(t) + 0.5} + 1 \right)$$
+- **Top-K Retrieval**: Utilizes a fixed-size binary `MinHeap` priority queue to retain the top $K$ results without sorting the full matching set.
 
-### 4. Relevance Scoring & Ranking (Okapi BM25)
-Located in `src/ranking/`, this module computes relevance scores using the industry-standard probabilistic IR formula:
-
-$$\text{Score}(D, Q) = \sum_{t \in Q} \text{IDF}(t) \cdot \frac{f(t, D) \cdot (k_1 + 1)}{f(t, D) + k_1 \cdot \left(1 - b + b \cdot \frac{|D|}{\text{avgdl}}\right)}$$
-
-Where:
-- $f(t, D)$ is the term frequency of term $t$ in document $D$.
-- $|D|$ is the length of document $D$ in tokens, and $\text{avgdl}$ is the average document length across the entire index corpus.
-- $k_1$ (default: `1.2`) controls term frequency saturation non-linearity.
-- $b$ (default: `0.75`) controls the degree of document length penalization.
-- $\text{IDF}(t)$ is the Robertson-Spärck Jones Inverse Document Frequency:
-  $$\text{IDF}(t) = \ln \left( \frac{N - n(t) + 0.5}{n(t) + 0.5} + 1 \right)$$
-- **Top-K Retrieval**: Uses a fixed-size `MinHeap` to collect the top $K$ scoring documents without sorting the entire candidate set.
-
-### 5. Query Parser & AST Execution Engine
-Located in `src/query/`, this module parses complex queries into an Abstract Syntax Tree.
-
-- **Lexer**: Tokenizes user queries into literal terms, boolean operators (`AND`, `OR`, `NOT`, `+`, `-`), grouped expressions `(...)`, and quoted strings `"..."`.
-- **AST Nodes**:
-  - `TermNode`: single token lookup.
-  - `PhraseNode`: positional proximity verification (e.g. `pos(t_{i+1}) == pos(t_i) + 1`).
-  - `AndNode`, `OrNode`, `NotNode`: set algebra operations.
-  - `PrefixNode`: wildcard / prefix trie scan.
-- **WAND (Weak AND) Dynamic Pruning**: Skips documents whose upper-bound score cannot beat the current threshold of the top-$K$ heap, speeding up search by $5\times\text{--}20\times$.
-
-### 6. Segment Management & WAL (Write-Ahead Log)
-Located in `src/storage/segment/`, this provides safe and crash-resilient updates:
-- Memory index accumulates documents up to a configurable threshold (e.g., 50,000 docs or 64MB).
-- Immutable segments are flushed to disk.
-- Background compaction merges small segments into larger, consolidated binary files while purging deleted documents.
+### 5. Query AST Parser & Evaluation Plan (`src/query`)
+- **Lexer & Recursive-Descent Parser**: Builds an Abstract Syntax Tree (AST) supporting:
+  - **Terms**: `database`
+  - **Boolean AND**: `distributed AND consensus`
+  - **Boolean OR**: `rust OR typescript`
+  - **Negation**: `engine NOT storage`
+  - **Exact Phrases**: `"byzantine fault tolerance"` (verified via positional index)
+  - **Prefixes**: `distrib*`
+- **WAND (Weak AND) Dynamic Pruning**: Calculates maximum score contributions per term to prune non-competitive candidate documents early.
 
 ---
 
-## 📁 Directory Layout
+## 🚀 Getting Started
+
+### 1. Prerequisites
+- **Node.js** `>= 20.0.0` or **Bun** `>= 1.1.0`
+- **npm**, **pnpm**, or **bun**
+
+### 2. Clone the Repository
+```bash
+git clone https://github.com/Krishnanand-10/Argus.git
+cd Argus
+```
+
+### 3. Install Dependencies
+```bash
+npm install
+```
+
+### 4. Build the Engine
+```bash
+npm run build
+```
+
+---
+
+## 🧭 CLI Commands & Usage
+
+Argus includes an interactive CLI for indexing files and querying indexes directly from your shell:
+
+```bash
+# Index a folder of JSON, Markdown, or TXT documents
+npx argus index --source ./docs --output ./indices/docs.argus
+
+# Search an index with full boolean or phrase syntax
+npx argus search --index ./indices/docs.argus "distributed consensus"
+
+# Inspect index statistics (total documents, term count, file size)
+npx argus stats --index ./indices/docs.argus
+
+# Start a local HTTP search daemon (port 8080)
+npx argus serve --index ./indices/docs.argus --port 8080
+```
+
+---
+
+## 📦 Programmatic Library API
+
+Argus can be embedded directly into any Node.js or TypeScript backend:
+
+```typescript
+import { ArgusEngine } from 'argus-search';
+
+// 1. Initialize Engine
+const engine = new ArgusEngine({
+  k1: 1.2,
+  b: 0.75,
+  stopWords: true,
+  stemming: true,
+});
+
+// 2. Add Documents
+await engine.addDocuments([
+  {
+    id: 1,
+    title: "Distributed Systems Architecture",
+    body: "Consensus algorithms such as Paxos and Raft ensure high availability and fault tolerance.",
+  },
+  {
+    id: 2,
+    title: "Search Engines from First Principles",
+    body: "Inverted indexes, postings lists, and Okapi BM25 ranking provide sub-millisecond retrieval.",
+  },
+]);
+
+// 3. Serialize Index to Disk (.argus binary)
+await engine.commit('./data/library.argus');
+
+// 4. Query with Boolean & Phrase Filters
+const results = await engine.search('consensus AND "fault tolerance"', { limit: 5 });
+
+console.log(results);
+/*
+[
+  {
+    docId: 1,
+    score: 2.8415,
+    matchedTerms: ["consensus", "fault", "toler"],
+    snippet: "...ensure high availability and **fault tolerance**."
+  }
+]
+*/
+```
+
+---
+
+## 📁 Project Structure
 
 ```
 Argus/
@@ -185,29 +229,29 @@ Argus/
 │   └── workflows/
 │       └── ci.yml               # Automated tests & linting
 ├── bin/
-│   └── argus.ts                 # CLI entry point executable
+│   └── argus.ts                 # CLI executable
 ├── src/
 │   ├── analyzer/                # Text Processing Pipeline
-│   │   ├── char-filter.ts       # Unicode normalization & HTML strip
+│   │   ├── char-filter.ts       # Unicode normalization & diacritic strip
 │   │   ├── tokenizer.ts         # Fast regex/stream word tokenizer
-│   │   ├── stop-words.ts        # Stopword dictionary & filter
+│   │   ├── stop-words.ts        # Standard English stopword filter
 │   │   ├── stemmer.ts           # Porter Stemmer implementation
-│   │   └── index.ts             # Composable Pipeline orchestrator
+│   │   └── index.ts             # Composable analysis pipeline
 │   ├── index/                   # Inverted Index & Postings
-│   │   ├── postings-list.ts     # In-memory postings linked/array list
-│   │   ├── skip-list.ts         # Fast skip pointer traversal
+│   │   ├── postings-list.ts     # Positional postings array list
+│   │   ├── skip-list.ts         # Skip pointer traversal
 │   │   ├── dictionary.ts        # Lexicon Radix Tree / Trie
 │   │   └── inverted-index.ts    # Main in-memory index structure
 │   ├── storage/                 # Binary Serialization & Disk I/O
 │   │   ├── vbyte.ts             # Variable-byte encoder / decoder
 │   │   ├── delta.ts             # D-gap delta compressor
 │   │   ├── serializer.ts        # Binary .argus writer (Buffer / Uint8Array)
-│   │   ├── deserializer.ts      # Binary .argus reader with zero-copy mmap-style offsets
-│   │   └── wal.ts               # Write-ahead append log for durability
+│   │   ├── deserializer.ts      # Binary .argus reader with zero-copy offsets
+│   │   └── wal.ts               # Write-ahead log for durability
 │   ├── ranking/                 # Information Retrieval Algorithms
 │   │   ├── bm25.ts              # Okapi BM25 scorer
 │   │   ├── tfidf.ts             # Classic TF-IDF scorer
-│   │   └── priority-queue.ts    # Min-Heap for Top-K results
+│   │   └── priority-queue.ts    # Min-Heap for Top-K extraction
 │   ├── query/                   # Query Parser & Execution
 │   │   ├── lexer.ts             # Query token scanner
 │   │   ├── parser.ts            # Recursive-descent AST parser
@@ -223,184 +267,57 @@ Argus/
 │   ├── inverted-index.test.ts
 │   ├── bm25.test.ts
 │   └── query-parser.test.ts
-├── benchmarks/                  # Performance & Latency Benchmarks
+├── benchmarks/                  # Performance Benchmarks
 │   └── search-benchmark.ts      # Throughput and latency profiling
 ├── .gitignore
-├── package.json
-├── tsconfig.json
 ├── LICENSE
 └── README.md
 ```
 
 ---
 
-## 🚀 Quickstart & Usage
+## 🗺️ Build Plan & Roadmap
 
-### Prerequisites
-- [Node.js](https://nodejs.org/) `>= 20.0.0` or [Bun](https://bun.sh/) `>= 1.1.0`
-- TypeScript `>= 5.3`
-
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/Krishnanand-10/Argus.git
-cd Argus
-
-# Install development dependencies
-npm install
-# or with pnpm
-pnpm install
-# or with bun
-bun install
-```
-
----
-
-### Programmatic TypeScript API
-
-```typescript
-import { ArgusEngine, Analyzer } from './src';
-
-// 1. Initialize Argus Engine
-const engine = new ArgusEngine({
-  k1: 1.2,
-  b: 0.75,
-  stopWords: true,
-  stemming: true
-});
-
-// 2. Add Documents
-await engine.addDocuments([
-  {
-    id: 1,
-    title: "Introduction to Distributed Systems",
-    body: "Consensus algorithms such as Paxos and Raft ensure fault tolerance across networked nodes."
-  },
-  {
-    id: 2,
-    title: "Building Search Engines in TypeScript",
-    body: "Inverted indexes, postings lists, and Okapi BM25 ranking provide sub-millisecond retrieval."
-  },
-  {
-    id: 3,
-    title: "Modern Database Storage Engines",
-    body: "LSM trees and Write-Ahead Logs (WAL) optimize sequential disk writes for high-throughput ingestion."
-  }
-]);
-
-// 3. Commit Index to Disk (.argus binary)
-await engine.commit('./data/indices/library.argus');
-
-// 4. Execute Search Queries
-const results = await engine.search('consensus AND "fault tolerance"', { limit: 5 });
-
-console.log(results);
-/*
-[
-  {
-    docId: 1,
-    score: 2.8415,
-    matchedTerms: ["consensus", "fault", "toler"],
-    snippet: "...ensure **fault tolerance** across networked nodes."
-  }
-]
-*/
-```
-
----
-
-### Command Line Interface (CLI)
-
-Argus comes with a bundled CLI utility for indexing local files and querying them directly from your terminal.
-
-```bash
-# Build the TypeScript project
-npm run build
-
-# Index a directory of text/markdown/json documents
-npx argus index --source ./docs --output ./indices/docs.argus
-
-# Search the index interactively
-npx argus search --index ./indices/docs.argus "distributed consensus"
-
-# Inspect index statistics (terms, postings count, disk footprint)
-npx argus stats --index ./indices/docs.argus
-
-# Start a local HTTP search daemon (port 8080)
-npx argus serve --index ./indices/docs.argus --port 8080
-```
-
----
-
-## 🔍 Query Syntax Reference
-
-Argus supports an expressive query language parsed directly into an AST:
-
-| Query Pattern | Example | Semantics |
-|---|---|---|
-| **Simple Terms** | `database storage` | Matches documents containing either term, ranked by BM25 score. |
-| **Boolean AND** | `distributed AND raft` | Both terms must be present in the document. |
-| **Boolean OR** | `rust OR typescript` | Either term may be present. |
-| **Negation (NOT)** | `systems NOT windows` | Must contain `systems` but exclude documents containing `windows`. |
-| **Exact Phrase** | `"acid compliant"` | Terms must appear adjacent to each other in the exact order. |
-| **Prefix Match** | `trans*` | Matches `transaction`, `transport`, `transit`, etc. |
-| **Grouped Expression** | `(paxos OR raft) AND consensus` | Parentheses enforce precedence in boolean evaluation. |
-
----
-
-## ⚡ Performance & Benchmark Goals
-
-Tested on consumer-grade hardware (Intel/Apple Silicon, 16GB RAM):
-
-| Metric | Target Goal | Status |
-|---|---|---|
-| **Ingestion Throughput** | `> 25,000 docs/sec` | 🎯 Target |
-| **Binary Compression Ratio** | `65% – 75%` vs raw JSON | 🎯 Target |
-| **Query Latency (p50)** | `< 1.8 ms` (100k docs) | 🎯 Target |
-| **Query Latency (p99)** | `< 6.5 ms` (100k docs) | 🎯 Target |
-| **Memory Footprint** | `< 128 MB` resident set during search | 🎯 Target |
-| **Phrase Query Latency** | `< 10 ms` for 3-term phrases | 🎯 Target |
-
----
-
-## 🗺️ Engineering Roadmap
-
-- [x] **Phase 1: Foundations & Architecture**
-  - [x] System design & specification
-  - [ ] Unicode tokenizer & Porter Stemmer
-  - [ ] Stopword elimination & Normalizer
-- [ ] **Phase 2: In-Memory Inverted Index**
-  - [ ] Postings list with document frequency and position tracking
-  - [ ] Term Dictionary (Trie / Radix structure)
+- [x] **Phase 1: Architecture & Design Specification**
+  - [x] Architectural documentation & binary format specification
+  - [ ] Character normalization & Unicode word tokenizer
+  - [ ] Porter Stemming algorithm & stopword filter
+- [ ] **Phase 2: Inverted Index & Positional Postings**
+  - [ ] Term Dictionary (Trie / Radix Tree)
+  - [ ] Positional postings list with Term Frequency and offsets
   - [ ] Skip lists for accelerated list intersections
-- [ ] **Phase 3: Relevance Scoring & Query Engine**
-  - [ ] Okapi BM25 implementation with $k_1$ and $b$ tuning
-  - [ ] Priority-Queue (Min-Heap) for top-K extraction
-  - [ ] Recursive-descent AST parser for Boolean and Phrase queries
-- [ ] **Phase 4: Binary Disk Persistence & Compression**
-  - [ ] D-Gap delta encoder
-  - [ ] Variable-Byte (VByte / Varint) bitwise encoder/decoder
-  - [ ] Custom `.argus` binary index serializer & zero-copy reader
-- [ ] **Phase 5: Performance Optimization & Distribution**
+- [ ] **Phase 3: Binary Storage & Compression**
+  - [ ] Variable-Byte (Varint) codec with bitwise operations
+  - [ ] Delta encoding (d-gaps) for DocIDs and positions
+  - [ ] Custom `.argus` binary serializer and zero-copy reader
+- [ ] **Phase 4: Relevance Scoring & Query Engine**
+  - [ ] Okapi BM25 scoring with $k_1$ and $b$ parameter tuning
+  - [ ] Binary MinHeap Priority Queue for top-$K$ selection
+  - [ ] Recursive-descent AST query parser (Boolean, Phrase, Prefix)
+- [ ] **Phase 5: CLI, REST Server & Benchmarks**
+  - [ ] Interactive CLI utility (`index`, `search`, `stats`, `serve`)
   - [ ] WAND (Weak AND) dynamic query pruning
-  - [ ] Segment merge & compaction strategy
-  - [ ] Interactive CLI + REST API server
-  - [ ] Comprehensive Vitest test suite & benchmarking harness
+  - [ ] Vitest test suite with 95%+ coverage & throughput benchmarks
 
 ---
 
-## 🤝 Contributing
+## 🧪 Running Tests
 
-Contributions, bug reports, and discussions are welcome!
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/varint-simd`)
-3. Commit your changes (`git commit -m "feat: add SIMD-style varint decompression"`)
-4. Push to the branch (`git push origin feature/varint-simd`)
-5. Open a Pull Request
+Argus uses **Vitest** for fast unit, integration, and property-based test suites:
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Generate code coverage report
+npm run test:coverage
+```
 
 ---
 
-## 📜 License
+## 📄 License
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+MIT © 2026 Krishnanand Tiwari
