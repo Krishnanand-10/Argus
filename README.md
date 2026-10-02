@@ -314,13 +314,13 @@ Argus/
   - [x] Variable-Byte (Varint) codec with bitwise operations
   - [x] Delta encoding (d-gaps) for DocIDs and positions
   - [x] Custom `.argus` binary serializer and zero-copy reader
-- [ ] **Phase 4: Relevance Scoring & Query Engine**
-  - [ ] Okapi BM25 scoring with $k_1$ and $b$ parameter tuning
-  - [ ] Binary MinHeap Priority Queue for top-$K$ selection
-  - [ ] Recursive-descent AST query parser (Boolean, Phrase, Prefix)
+- [x] **Phase 4: Relevance Scoring & Query Engine**
+  - [x] Okapi BM25 scoring with $k_1$ and $b$ parameter tuning
+  - [x] Binary MinHeap Priority Queue for top-$K$ selection
+  - [x] Recursive-descent AST query parser (Boolean, Phrase, Prefix)
+  - [x] WAND (Weak AND) dynamic query pruning
 - [ ] **Phase 5: CLI, REST Server & Benchmarks**
   - [ ] Interactive CLI utility (`index`, `search`, `stats`, `serve`)
-  - [ ] WAND (Weak AND) dynamic query pruning
   - [ ] Vitest test suite with 95%+ coverage & throughput benchmarks
 
 ---
