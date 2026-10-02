@@ -310,10 +310,10 @@ Argus/
   - [x] Term Dictionary (Trie / Radix Tree)
   - [x] Positional postings list with Term Frequency and offsets
   - [x] Skip lists for accelerated list intersections
-- [ ] **Phase 3: Binary Storage & Compression**
-  - [ ] Variable-Byte (Varint) codec with bitwise operations
-  - [ ] Delta encoding (d-gaps) for DocIDs and positions
-  - [ ] Custom `.argus` binary serializer and zero-copy reader
+- [x] **Phase 3: Binary Storage & Compression**
+  - [x] Variable-Byte (Varint) codec with bitwise operations
+  - [x] Delta encoding (d-gaps) for DocIDs and positions
+  - [x] Custom `.argus` binary serializer and zero-copy reader
 - [ ] **Phase 4: Relevance Scoring & Query Engine**
   - [ ] Okapi BM25 scoring with $k_1$ and $b$ parameter tuning
   - [ ] Binary MinHeap Priority Queue for top-$K$ selection

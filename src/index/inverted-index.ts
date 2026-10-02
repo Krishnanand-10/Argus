@@ -126,6 +126,47 @@ export class InvertedIndex {
   }
 
   /**
+   * Returns all indexed documents.
+   */
+  public getAllDocuments(): IndexedDocument[] {
+    return Array.from(this.documents.values());
+  }
+
+  /**
+   * Returns all indexed document IDs.
+   */
+  public getDocumentIds(): number[] {
+    return Array.from(this.documents.keys());
+  }
+
+  /**
+   * Restores an InvertedIndex instance from a deserialized snapshot.
+   */
+  public restoreFromSnapshot(
+    documents: IndexedDocument[],
+    termEntries: Array<{ term: string; postings: PostingsList; offset?: number }>,
+    totalTokens: number
+  ): void {
+    this.documents.clear();
+    for (const doc of documents) {
+      this.documents.set(doc.id, doc);
+    }
+
+    for (const entry of termEntries) {
+      const termEntry = this.dictionary.getOrCreate(entry.term);
+      for (const posting of entry.postings.getAll()) {
+        for (const pos of posting.positions) {
+          termEntry.postings.add(posting.docId, pos);
+        }
+      }
+      termEntry.offset = entry.offset;
+    }
+
+    this._totalTokens = totalTokens;
+    this.buildSkipPointers();
+  }
+
+  /**
    * Retrieves the token length of a document (|D|).
    */
   public getDocLength(docId: number): number | undefined {
