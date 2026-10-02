@@ -4,3 +4,4 @@ export * from './storage/index.js';
 export * from './ranking/index.js';
 export * from './query/index.js';
 export * from './engine.js';
+export * from './server/index.js';

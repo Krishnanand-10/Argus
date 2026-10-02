@@ -319,9 +319,9 @@ Argus/
   - [x] Binary MinHeap Priority Queue for top-$K$ selection
   - [x] Recursive-descent AST query parser (Boolean, Phrase, Prefix)
   - [x] WAND (Weak AND) dynamic query pruning
-- [ ] **Phase 5: CLI, REST Server & Benchmarks**
-  - [ ] Interactive CLI utility (`index`, `search`, `stats`, `serve`)
-  - [ ] Vitest test suite with 95%+ coverage & throughput benchmarks
+- [x] **Phase 5: CLI, REST Server & Benchmarks**
+  - [x] Interactive CLI utility (`index`, `search`, `stats`, `serve`)
+  - [x] Vitest test suite with 95%+ coverage & throughput benchmarks
 
 ---
 
