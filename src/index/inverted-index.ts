@@ -98,6 +98,9 @@ export class InvertedIndex {
    * Automatically normalizes the term with the analyzer.
    */
   public getPostings(term: string): PostingsList | undefined {
+    const direct = this.dictionary.get(term);
+    if (direct) return direct.postings;
+
     const normalized = this.analyzer.normalizeTerm(term);
     return this.dictionary.get(normalized)?.postings;
   }
@@ -106,6 +109,16 @@ export class InvertedIndex {
    * Retrieves term metadata (docFrequency, totalTermFrequency) for a term.
    */
   public getTermMetadata(term: string): TermMetadata | undefined {
+    const direct = this.dictionary.get(term);
+    if (direct) {
+      return {
+        term: direct.term,
+        docFrequency: direct.docFrequency,
+        totalTermFrequency: direct.totalTermFrequency,
+        offset: direct.offset,
+      };
+    }
+
     const normalized = this.analyzer.normalizeTerm(term);
     const entry = this.dictionary.get(normalized);
     if (!entry) return undefined;

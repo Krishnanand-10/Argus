@@ -17,6 +17,7 @@ coverage/
 *.index
 *.bin
 *.wal
+*.argus
 data/indexes/
 data/cache/
 

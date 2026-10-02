@@ -41,8 +41,7 @@ export class WANDScorer {
 
     // Initialize posting cursors and calculate upper-bound scores
     for (const term of terms) {
-      const normalized = index.textAnalyzer.normalizeTerm(term);
-      const postings = index.getPostings(normalized);
+      const postings = index.getPostings(term);
       if (!postings || postings.length === 0) continue;
 
       const idf = this.scorer.computeIDF(postings.docFrequency, stats.totalDocuments);
@@ -50,7 +49,7 @@ export class WANDScorer {
       const upperBound = idf * (this.scorer.k1 + 1);
 
       cursors.push({
-        term: normalized,
+        term,
         postings,
         cursor: 0,
         upperBound,

@@ -61,8 +61,7 @@ export class BM25Scorer {
     const matchedTerms: string[] = [];
 
     for (const term of queryTerms) {
-      const normalized = index.textAnalyzer.normalizeTerm(term);
-      const postings = index.getPostings(normalized);
+      const postings = index.getPostings(term);
       if (!postings) continue;
 
       const posting = postings.getPostingForDoc(docId);
