@@ -117,5 +117,40 @@ describe('Server & CLI Suite', () => {
       expect(searchData.totalResults).toBe(1);
       expect(searchData.results[0].docId).toBe(3);
     });
+
+    it('handles batch file uploads dynamically at POST /api/upload', async () => {
+      const uploadPayload = {
+        files: [
+          {
+            name: 'graph-databases.md',
+            content: 'Graph databases use nodes and edges to model complex relational graphs and topological networks.',
+          },
+          {
+            name: 'vector-search.json',
+            content: JSON.stringify({
+              title: 'Vector Embeddings',
+              body: 'Approximate nearest neighbor search across high-dimensional vector spaces.',
+            }),
+          },
+        ],
+      };
+
+      const res = await fetch(`http://127.0.0.1:${port}/api/upload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(uploadPayload),
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(data.addedCount).toBe(2);
+
+      // Verify the uploaded document is immediately searchable
+      const searchRes = await fetch(`http://127.0.0.1:${port}/api/search?q=topological`);
+      const searchData = await searchRes.json();
+      expect(searchData.totalResults).toBe(1);
+      expect(searchData.results[0].snippet).toContain('**topological**');
+    });
   });
 });

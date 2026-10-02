@@ -1,23 +1,27 @@
 import * as http from 'node:http';
+import * as path from 'node:path';
 import type { ArgusEngine } from '../engine.js';
 import type { IndexableDocument } from '../index/types.js';
 
 export interface ServerOptions {
   port?: number;
   host?: string;
+  indexPath?: string;
 }
 
 /**
- * Lightweight, zero-dependency HTTP search server providing a REST API
- * and an embedded browser search dashboard.
+ * Lightweight, zero-dependency HTTP search server providing a REST API,
+ * dynamic document uploads, and an embedded browser search dashboard.
  */
 export class ArgusServer {
   private readonly engine: ArgusEngine;
+  private readonly indexPath?: string;
   private server: http.Server | null = null;
   private activePort: number = 0;
 
-  constructor(engine: ArgusEngine) {
+  constructor(engine: ArgusEngine, indexPath?: string) {
     this.engine = engine;
+    this.indexPath = indexPath;
   }
 
   /**
@@ -114,7 +118,83 @@ export class ArgusServer {
       return;
     }
 
-    // Route: POST /api/index
+    // Route: POST /api/upload -> Batch upload documents from browser
+    if (method === 'POST' && pathname === '/api/upload') {
+      let body = '';
+      req.on('data', (chunk) => {
+        body += chunk;
+      });
+      req.on('end', async () => {
+        try {
+          const payload = JSON.parse(body) as { files: Array<{ name: string; content: string }> };
+          if (!payload.files || !Array.isArray(payload.files)) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Expected { files: Array<{ name, content }> }' }));
+            return;
+          }
+
+          const existingDocs = this.engine.invertedIndex.getAllDocuments();
+          let nextId = existingDocs.reduce((max, d) => Math.max(max, d.id), 0) + 1;
+          const documentsToIndex: IndexableDocument[] = [];
+
+          for (const file of payload.files) {
+            const ext = path.extname(file.name).toLowerCase();
+            if (ext === '.json') {
+              try {
+                const parsed = JSON.parse(file.content);
+                if (Array.isArray(parsed)) {
+                  for (const item of parsed) {
+                    documentsToIndex.push({
+                      id: typeof item.id === 'number' ? item.id : nextId++,
+                      ...item,
+                    });
+                  }
+                } else if (typeof parsed === 'object' && parsed !== null) {
+                  documentsToIndex.push({
+                    id: typeof parsed.id === 'number' ? parsed.id : nextId++,
+                    ...parsed,
+                  });
+                }
+              } catch {
+                documentsToIndex.push({
+                  id: nextId++,
+                  title: file.name,
+                  body: file.content,
+                });
+              }
+            } else {
+              documentsToIndex.push({
+                id: nextId++,
+                title: file.name,
+                body: file.content,
+              });
+            }
+          }
+
+          await this.engine.addDocuments(documentsToIndex);
+
+          // Auto-persist if indexPath is known
+          if (this.indexPath) {
+            await this.engine.commit(this.indexPath);
+          }
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              success: true,
+              addedCount: documentsToIndex.length,
+              stats: this.engine.getStats(),
+            })
+          );
+        } catch (err: any) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: err.message || 'Upload failed' }));
+        }
+      });
+      return;
+    }
+
+    // Route: POST /api/index -> Single document indexing
     if (method === 'POST' && pathname === '/api/index') {
       let body = '';
       req.on('data', (chunk) => {
@@ -125,6 +205,9 @@ export class ArgusServer {
           const doc = JSON.parse(body) as IndexableDocument;
           if (doc && typeof doc.id === 'number') {
             await this.engine.addDocument(doc);
+            if (this.indexPath) {
+              await this.engine.commit(this.indexPath);
+            }
             res.writeHead(201, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: true, docId: doc.id }));
           } else {
@@ -154,14 +237,16 @@ export class ArgusServer {
   <title>Argus — Full-Text Search Playground</title>
   <style>
     :root {
-      --bg: #0f172a;
+      --bg: #0b1120;
       --card: #1e293b;
+      --card-hover: #24344d;
       --border: #334155;
       --text: #f8fafc;
       --muted: #94a3b8;
       --primary: #38bdf8;
       --accent: #818cf8;
       --highlight: #fef08a;
+      --success: #34d399;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -208,6 +293,45 @@ export class ArgusServer {
       color: var(--muted);
     }
     .badge b { color: var(--text); }
+    
+    /* Upload Zone */
+    .upload-box {
+      border: 2px dashed var(--border);
+      background: rgba(30, 41, 59, 0.4);
+      border-radius: 12px;
+      padding: 1.25rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .upload-box:hover, .upload-box.dragover {
+      border-color: var(--primary);
+      background: rgba(56, 189, 248, 0.08);
+    }
+    .upload-icon {
+      font-size: 1.7rem;
+    }
+    .upload-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .upload-sub {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .upload-status {
+      font-size: 0.85rem;
+      color: var(--success);
+      margin-top: 0.25rem;
+      display: none;
+    }
+
+    /* Search Bar */
     .search-bar {
       display: flex;
       gap: 0.5rem;
@@ -228,7 +352,7 @@ export class ArgusServer {
     }
     button {
       background: linear-gradient(135deg, var(--primary), var(--accent));
-      color: #0f172a;
+      color: #0b1120;
       border: none;
       padding: 0 1.5rem;
       border-radius: 8px;
@@ -237,7 +361,7 @@ export class ArgusServer {
       cursor: pointer;
     }
     .query-help {
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       color: var(--muted);
       line-height: 1.4;
     }
@@ -285,7 +409,7 @@ export class ArgusServer {
       line-height: 1.5;
     }
     .result-snippet b, .result-snippet strong {
-      color: #0f172a;
+      color: #0b1120;
       background: var(--highlight);
       padding: 0.1rem 0.25rem;
       border-radius: 2px;
@@ -294,7 +418,7 @@ export class ArgusServer {
       font-size: 0.8rem;
       color: var(--muted);
       display: flex;
-      gap: 0.5rem;
+      gap: 0.75rem;
     }
     .empty-state {
       text-align: center;
@@ -314,26 +438,112 @@ export class ArgusServer {
       </div>
     </header>
 
+    <!-- Drag & Drop Uploader -->
+    <div class="upload-box" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <div class="upload-icon">📂</div>
+      <div class="upload-title">Drop your documents here, or click to browse</div>
+      <div class="upload-sub">Supports Markdown (.md), Plaintext (.txt), JSON (.json), and CSV</div>
+      <div class="upload-status" id="uploadStatus"></div>
+      <input type="file" id="fileInput" multiple style="display:none;" />
+    </div>
+
+    <!-- Search Bar -->
     <div class="search-bar">
-      <input type="text" id="queryInput" placeholder="Try: distributed AND consensus, &quot;fault tolerance&quot;, distrib*..." autofocus />
+      <input type="text" id="queryInput" placeholder="Search: consensus, &quot;virtual memory&quot;, distrib*, database NOT relational..." autofocus />
       <button onclick="executeSearch()">Search</button>
     </div>
 
     <div class="query-help">
-      Supports Boolean logic (<code>AND</code>, <code>OR</code>, <code>NOT</code>), exact phrases (<code>"byzantine fault tolerance"</code>), prefixes (<code>distrib*</code>), and parentheses (<code>(paxos OR raft) AND consensus</code>).
+      Supports Boolean (<code>AND</code>, <code>OR</code>, <code>NOT</code>), exact phrases (<code>"byzantine fault tolerance"</code>), prefixes (<code>distrib*</code>), and grouping (<code>(paxos OR raft) AND consensus</code>).
     </div>
 
     <div id="meta" style="font-size:0.85rem; color:var(--muted); display:none;"></div>
     <div id="results">
-      <div class="empty-state">Type a query above to search with Okapi BM25 relevance ranking.</div>
+      <div class="empty-state">Type a query above to search your indexed documents.</div>
     </div>
   </div>
 
   <script>
     const input = document.getElementById('queryInput');
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const uploadStatus = document.getElementById('uploadStatus');
+
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') executeSearch();
     });
+
+    // Drag and Drop Handling
+    ['dragenter', 'dragover'].forEach(event => {
+      dropZone.addEventListener(event, (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(event => {
+      dropZone.addEventListener(event, (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+      });
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      const files = e.dataTransfer.files;
+      if (files && files.length > 0) handleFiles(files);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      const files = e.target.files;
+      if (files && files.length > 0) handleFiles(files);
+    });
+
+    async function handleFiles(fileList) {
+      uploadStatus.style.display = 'block';
+      uploadStatus.style.color = 'var(--primary)';
+      uploadStatus.textContent = 'Reading and indexing ' + fileList.length + ' file(s)...';
+
+      const filePayloads = [];
+      for (const file of fileList) {
+        try {
+          const text = await file.text();
+          filePayloads.push({ name: file.name, content: text });
+        } catch (err) {
+          console.error('Failed to read file:', file.name, err);
+        }
+      }
+
+      if (filePayloads.length === 0) {
+        uploadStatus.textContent = 'Failed to read any valid files.';
+        return;
+      }
+
+      try {
+        const start = performance.now();
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ files: filePayloads })
+        });
+        const data = await res.json();
+        const elapsed = (performance.now() - start).toFixed(0);
+
+        if (data.success) {
+          uploadStatus.style.color = 'var(--success)';
+          uploadStatus.textContent = '✅ Indexed ' + data.addedCount + ' document(s) in ' + elapsed + 'ms! You can now search them below.';
+          // Update stats badges
+          document.getElementById('stat-docs').textContent = data.stats.totalDocuments;
+          document.getElementById('stat-terms').textContent = data.stats.totalTerms;
+          document.getElementById('stat-avgdl').textContent = data.stats.averageDocLength.toFixed(1);
+        } else {
+          uploadStatus.style.color = '#f87171';
+          uploadStatus.textContent = 'Error: ' + data.error;
+        }
+      } catch (err) {
+        uploadStatus.style.color = '#f87171';
+        uploadStatus.textContent = 'Upload failed: ' + err.message;
+      }
+    }
 
     async function executeSearch() {
       const q = input.value.trim();

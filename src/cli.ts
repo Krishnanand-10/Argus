@@ -16,12 +16,43 @@ interface CliArgs {
   help?: boolean;
 }
 
+const KNOWN_COMMANDS = new Set(['index', 'search', 'stats', 'serve', 'help']);
+
+/**
+ * Searches for an existing .argus binary index in the current directory.
+ */
+export function autoDetectIndex(specifiedPath?: string): string | null {
+  if (specifiedPath) {
+    const resolved = path.resolve(specifiedPath);
+    return fs.existsSync(resolved) ? resolved : null;
+  }
+
+  const commonNames = ['library.argus', 'docs.argus', 'index.argus'];
+  for (const name of commonNames) {
+    const candidate = path.resolve(name);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+
+  // Scan current directory for any *.argus file
+  try {
+    const files = fs.readdirSync(process.cwd());
+    const argusFile = files.find((f) => f.endsWith('.argus'));
+    if (argusFile) return path.resolve(argusFile);
+  } catch {
+    // Ignore directory scan errors
+  }
+
+  return null;
+}
+
 export function parseArgs(args: string[]): CliArgs {
   const result: CliArgs = {
     command: '',
   };
 
+  const positional: string[] = [];
   let i = 0;
+
   while (i < args.length) {
     const arg = args[i]!;
 
@@ -38,14 +69,34 @@ export function parseArgs(args: string[]): CliArgs {
     } else if (arg === '--limit' && i + 1 < args.length) {
       result.limit = parseInt(args[++i]!, 10);
     } else if (!arg.startsWith('-')) {
-      if (!result.command) {
-        result.command = arg;
-      } else if (!result.query) {
-        result.query = arg;
-      }
+      positional.push(arg);
     }
 
     i++;
+  }
+
+  if (positional.length > 0) {
+    const first = positional[0]!;
+    if (KNOWN_COMMANDS.has(first.toLowerCase())) {
+      result.command = first.toLowerCase();
+      // Handle remaining positional args based on command
+      if (result.command === 'index') {
+        if (!result.source && positional[1]) result.source = positional[1];
+        if (!result.output && positional[2]) result.output = positional[2];
+      } else if (result.command === 'search') {
+        if (!result.query && positional[1]) result.query = positional.slice(1).join(' ');
+      } else if (result.command === 'serve') {
+        if (!result.port && positional[1] && !isNaN(Number(positional[1]))) {
+          result.port = parseInt(positional[1], 10);
+        }
+      } else if (result.command === 'stats') {
+        if (!result.index && positional[1]) result.index = positional[1];
+      }
+    } else {
+      // Shorthand: running `argus "search query"` directly defaults to search
+      result.command = 'search';
+      result.query = positional.join(' ');
+    }
   }
 
   return result;
@@ -54,8 +105,15 @@ export function parseArgs(args: string[]): CliArgs {
 export async function runCli(argv: string[] = process.argv.slice(2)): Promise<void> {
   const args = parseArgs(argv);
 
-  if (args.help || !args.command) {
+  if (args.help) {
     printHelp();
+    return;
+  }
+
+  // Zero-config default: running `argus` with no arguments starts the server & UI!
+  if (!args.command) {
+    console.log('🚀 No command specified. Starting Argus Web UI & Search Server...');
+    await handleServe(args);
     return;
   }
 
@@ -81,15 +139,17 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<vo
 }
 
 async function handleIndex(args: CliArgs): Promise<void> {
-  if (!args.source || !args.output) {
-    console.error('Error: index command requires both --source and --output flags.');
-    console.error('Usage: argus index --source ./docs --output ./indices/docs.argus');
-    process.exitCode = 1;
-    return;
-  }
+  // Smart default: source defaults to './', output defaults to './index.argus'
+  const sourceInput = args.source ?? './';
+  const sourcePath = path.resolve(sourceInput);
 
-  const sourcePath = path.resolve(args.source);
-  const outputPath = path.resolve(args.output);
+  let outputInput = args.output;
+  if (!outputInput) {
+    // If indexing a folder, name it after the folder: ./my-folder.argus
+    const base = path.basename(sourcePath);
+    outputInput = base && base !== '.' ? `./${base}.argus` : './index.argus';
+  }
+  const outputPath = path.resolve(outputInput);
 
   if (!fs.existsSync(sourcePath)) {
     console.error(`Error: Source path does not exist: ${sourcePath}`);
@@ -114,33 +174,36 @@ async function handleIndex(args: CliArgs): Promise<void> {
   const fileStats = fs.statSync(outputPath);
   const sizeKb = (fileStats.size / 1024).toFixed(2);
 
-  console.log(`✅ Successfully indexed ${documents.length} document(s) in ${elapsedMs}ms`);
-  console.log(`💾 Serialized .argus binary index: ${outputPath} (${sizeKb} KB)`);
+  console.log(`✅ Indexed ${documents.length} document(s) in ${elapsedMs}ms`);
+  console.log(`💾 Index saved to: ${outputPath} (${sizeKb} KB)`);
+  console.log(`\n💡 Tip: Run 'argus search "your query"' or 'argus serve' to test.`);
 }
 
 async function handleSearch(args: CliArgs): Promise<void> {
-  if (!args.index || !args.query) {
-    console.error('Error: search command requires both --index and a search query.');
-    console.error('Usage: argus search --index ./indices/docs.argus "distributed consensus"');
+  if (!args.query) {
+    console.error('Error: Please provide a search query.');
+    console.error('Usage: argus search "distributed consensus"');
     process.exitCode = 1;
     return;
   }
 
-  const indexPath = path.resolve(args.index);
-  if (!fs.existsSync(indexPath)) {
-    console.error(`Error: Index file does not exist: ${indexPath}`);
+  // Auto-detect index file if not specified
+  const detectedIndex = autoDetectIndex(args.index);
+  if (!detectedIndex) {
+    console.error('Error: No index file found.');
+    console.error('Please index documents first: argus index ./your-folder');
     process.exitCode = 1;
     return;
   }
 
-  const engine = await ArgusEngine.load(indexPath);
+  const engine = await ArgusEngine.load(detectedIndex);
   const limit = args.limit ?? 10;
 
   const startTime = performance.now();
   const results = engine.search(args.query, { limit });
   const elapsedMs = (performance.now() - startTime).toFixed(2);
 
-  console.log(`\n🔎 Query: "${args.query}" — ${results.length} result(s) in ${elapsedMs}ms\n`);
+  console.log(`\n🔎 Query: "${args.query}" (Index: ${path.basename(detectedIndex)}) — ${results.length} result(s) in ${elapsedMs}ms\n`);
 
   if (results.length === 0) {
     console.log('No matching documents found.');
@@ -159,25 +222,19 @@ async function handleSearch(args: CliArgs): Promise<void> {
 }
 
 async function handleStats(args: CliArgs): Promise<void> {
-  if (!args.index) {
-    console.error('Error: stats command requires --index flag.');
-    console.error('Usage: argus stats --index ./indices/docs.argus');
+  const detectedIndex = autoDetectIndex(args.index);
+  if (!detectedIndex) {
+    console.error('Error: No index file found in current directory.');
+    console.error('Usage: argus stats [path/to/file.argus]');
     process.exitCode = 1;
     return;
   }
 
-  const indexPath = path.resolve(args.index);
-  if (!fs.existsSync(indexPath)) {
-    console.error(`Error: Index file does not exist: ${indexPath}`);
-    process.exitCode = 1;
-    return;
-  }
-
-  const buffer = await fs.promises.readFile(indexPath);
+  const buffer = await fs.promises.readFile(detectedIndex);
   const header = readIndexHeader(new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength));
   const fileSizeKb = (header.totalFileSize / 1024).toFixed(2);
 
-  console.log('\n📊 Argus Index Statistics');
+  console.log(`\n📊 Argus Index Statistics (${path.basename(detectedIndex)})`);
   console.log('───────────────────────────────────────');
   console.log(`Format Version:       v${header.version}`);
   console.log(`Total Documents (N):  ${header.totalDocuments}`);
@@ -189,24 +246,22 @@ async function handleStats(args: CliArgs): Promise<void> {
 }
 
 async function handleServe(args: CliArgs): Promise<void> {
-  if (!args.index) {
-    console.error('Error: serve command requires --index flag.');
-    console.error('Usage: argus serve --index ./indices/docs.argus [--port 8080]');
-    process.exitCode = 1;
-    return;
+  const detectedIndex = autoDetectIndex(args.index);
+  let engine: ArgusEngine;
+  let activeIndexPath: string | undefined;
+
+  if (detectedIndex) {
+    console.log(`Loading index from ${path.basename(detectedIndex)}...`);
+    engine = await ArgusEngine.load(detectedIndex);
+    activeIndexPath = detectedIndex;
+  } else {
+    console.log('No existing index found. Starting fresh search engine...');
+    console.log('💡 Tip: You can drag and drop documents directly onto the Web UI to index them!\n');
+    activeIndexPath = path.resolve('./index.argus');
+    engine = new ArgusEngine();
   }
 
-  const indexPath = path.resolve(args.index);
-  if (!fs.existsSync(indexPath)) {
-    console.error(`Error: Index file does not exist: ${indexPath}`);
-    process.exitCode = 1;
-    return;
-  }
-
-  console.log(`Loading index from ${indexPath}...`);
-  const engine = await ArgusEngine.load(indexPath);
-  const server = new ArgusServer(engine);
-
+  const server = new ArgusServer(engine, activeIndexPath);
   const port = args.port ?? 8080;
   const activePort = await server.start({ port });
 
@@ -271,33 +326,28 @@ async function collectDocuments(targetPath: string): Promise<IndexableDocument[]
 
 function printHelp(): void {
   console.log(`
-🚀 Argus — High-Performance Full-Text Search Engine CLI
+🚀 Argus — High-Performance Full-Text Search Engine
 
-USAGE:
-  argus <command> [options]
+DEAD SIMPLE USAGE:
+  argus                         Start the Web UI immediately at http://localhost:8080
+  argus index <folder>          Index any folder (e.g. 'argus index ./my-docs')
+  argus search "<query>"        Search your documents (e.g. 'argus search "consensus"')
+  argus "<query>"               Direct search shorthand (e.g. 'argus "machine learning"')
+  argus stats                   View index statistics
+  argus serve [port]            Start web UI / API server (default: port 8080)
 
-COMMANDS:
-  index   Index documents into an .argus binary file
-          --source <dir|file>   Directory or file of documents (.json, .md, .txt)
-          --output <file.argus> Target binary index path
-
-  search  Search an index using BM25 relevance and boolean query syntax
-          --index <file.argus>  Path to binary .argus index
-          "<query>"             Search query (e.g. 'consensus AND "fault tolerance"')
-          --limit <number>      Maximum number of results to display (default: 10)
-
-  stats   Inspect index statistics and metadata
-          --index <file.argus>  Path to binary .argus index
-
-  serve   Start local HTTP search server with REST API and Web UI
-          --index <file.argus>  Path to binary .argus index
-          --port <number>       Port number (default: 8080)
+OPTIONS:
+  --source <path>               Folder or file to index
+  --output <file.argus>         Custom target output index path
+  --index <file.argus>          Specify which index file to use (auto-detected if omitted)
+  --limit <number>              Maximum search results to display (default: 10)
+  --port <number>               Web server port (default: 8080)
+  --help, -h                    Show this help message
 
 EXAMPLES:
-  argus index --source ./docs --output ./indices/docs.argus
-  argus search --index ./indices/docs.argus "distributed consensus"
-  argus stats --index ./indices/docs.argus
-  argus serve --index ./indices/docs.argus --port 8080
+  argus index ./notes           (Indexes ./notes into ./notes.argus)
+  argus "fault tolerance"       (Searches for exact phrase)
+  argus serve 3000              (Starts Web UI on port 3000)
 `);
 }
 
