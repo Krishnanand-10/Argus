@@ -5,6 +5,7 @@ import { ArgusEngine } from './engine.js';
 import { ArgusServer } from './server/server.js';
 import { readIndexHeader } from './storage/deserializer.js';
 import type { IndexableDocument } from './index/types.js';
+import { DEFAULT_STOP_WORDS } from './analyzer/stop-words.js';
 
 interface CliArgs {
   command: string;
@@ -232,6 +233,13 @@ async function handleSearch(args: CliArgs): Promise<void> {
 
   if (results.length === 0) {
     console.log('No matching documents found.');
+
+    const rawTerms = args.query.toLowerCase().match(/[a-z0-9_]+/g) || [];
+    if (rawTerms.length > 0 && rawTerms.every((t) => DEFAULT_STOP_WORDS.has(t))) {
+      console.log(`\n\x1b[33m💡 Note: "${args.query}" consists of common English stop word(s) filtered out during indexing.\x1b[0m`);
+      console.log('\x1b[2m   Argus removes high-frequency grammatical words (e.g. "where", "the", "what", "is") to optimize BM25 relevance scoring.\x1b[0m');
+      console.log('\x1b[2m   Try searching for content-specific terms (e.g. keywords, names, technologies).\x1b[0m');
+    }
     return;
   }
 

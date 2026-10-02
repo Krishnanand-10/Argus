@@ -87,12 +87,12 @@ export class QueryEvaluator {
           return postings.getAll().map((p) => p.docId);
         }
 
-        // Automatic typo tolerance fallback when exact matches are empty
-        if (options?.fuzzy !== false && termVal.length >= 4) {
+        // Automatic typo tolerance fallback when exact matches are empty (Lucene AUTO standard)
+        if (options?.fuzzy !== false && termVal.length >= 3) {
           const maxDist =
             typeof options?.fuzzy === 'number'
               ? options.fuzzy
-              : termVal.length >= 8
+              : termVal.length >= 6
                 ? 2
                 : 1;
           const matches = index.searchFuzzy(termVal, maxDist);
@@ -202,11 +202,11 @@ export class QueryEvaluator {
           const postings = index.getPostings(val);
           if (postings && postings.length > 0) {
             terms.add(val);
-          } else if (options?.fuzzy !== false && val.length >= 4) {
+          } else if (options?.fuzzy !== false && val.length >= 3) {
             const maxDist =
               typeof options?.fuzzy === 'number'
                 ? options.fuzzy
-                : val.length >= 8
+                : val.length >= 6
                   ? 2
                   : 1;
             const matches = index.searchFuzzy(val, maxDist);
