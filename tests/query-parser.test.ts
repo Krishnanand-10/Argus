@@ -190,5 +190,57 @@ describe('Query Parsing & Execution Engine', () => {
       expect(restoredResults[0]!.docId).toBe(1);
       expect(restoredResults[0]!.score).toBeCloseTo(searchResults[0]!.score, 3);
     });
+
+    it('performs automatic typo tolerance when words have minor spelling errors', async () => {
+      const engine = new ArgusEngine();
+      await engine.addDocuments([
+        {
+          id: 1,
+          title: 'Distributed Systems Architecture',
+          body: 'Consensus algorithms such as Paxos and Raft ensure high availability and fault tolerance.',
+        },
+        {
+          id: 2,
+          title: 'Full-Text Search Engine',
+          body: 'Inverted indexes, postings lists, and Okapi BM25 ranking provide sub-millisecond retrieval.',
+        },
+      ]);
+
+      // Typo 'postngs' (missing 'i') -> should automatically find Doc 2
+      const typoResults = engine.search('postngs');
+      expect(typoResults.length).toBeGreaterThan(0);
+      expect(typoResults[0]!.docId).toBe(2);
+
+      // Explicit fuzzy query: 'algoritm~2'
+      const fuzzyResults = engine.search('algoritm~2');
+      expect(fuzzyResults.length).toBeGreaterThan(0);
+      expect(fuzzyResults[0]!.docId).toBe(1);
+    });
+
+    it('generates highlighted snippets with word stem matching', async () => {
+      const engine = new ArgusEngine();
+      await engine.addDocuments([
+        {
+          id: 1,
+          title: 'Database Internals',
+          body: 'Modern database systems use write-ahead logging to guarantee durability and transaction atomicity.',
+        },
+      ]);
+
+      const results = engine.search('logging durability', { highlight: true });
+      expect(results.length).toBe(1);
+      expect(results[0]!.snippet).toBeDefined();
+      expect(results[0]!.snippet).toContain('**');
+    });
+
+    it('returns autocomplete suggestions via engine.suggest', async () => {
+      const engine = new ArgusEngine();
+      await engine.addDocuments([
+        { id: 1, text: 'Distributed consensus algorithms in decentralized networks.' },
+      ]);
+
+      const suggestions = engine.suggest('dist', 3);
+      expect(suggestions.length).toBeGreaterThan(0);
+    });
   });
 });

@@ -264,6 +264,32 @@ export class InvertedIndex {
   }
 
   /**
+   * Searches for terms within maxDistance Levenshtein edit distance for typo tolerance.
+   * Returns matching term entries along with their edit distance.
+   */
+  public searchFuzzy(
+    term: string,
+    maxDistance: number = 2
+  ): Array<{ term: string; postings: PostingsList; distance: number }> {
+    const normalized = this.analyzer.normalizeTerm(term);
+    const searchTarget = normalized.length > 0 ? normalized : term.toLowerCase();
+    const matches = this.dictionary.fuzzySearch(searchTarget, maxDistance);
+    return matches.map((m) => ({
+      term: m.term,
+      postings: m.entry.postings,
+      distance: m.distance,
+    }));
+  }
+
+  /**
+   * Suggests top term autocompletions for a prefix, ranked by popularity.
+   */
+  public suggest(prefix: string, limit: number = 5): string[] {
+    const normalized = prefix.toLowerCase();
+    return this.dictionary.suggest(normalized, limit);
+  }
+
+  /**
    * Extracts combined searchable text from a document's fields.
    */
   private extractDocumentText(doc: IndexableDocument): string {

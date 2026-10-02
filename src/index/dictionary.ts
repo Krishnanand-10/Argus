@@ -224,6 +224,84 @@ export class RadixTree<T> {
   }
 
   /**
+   * Searches for all entries whose keys are within maxDistance Levenshtein edit distance of the target.
+   * Leverages DP row branch pruning on the Radix Tree for sub-millisecond fuzzy lookups.
+   */
+  public findFuzzy(
+    target: string,
+    maxDistance: number = 2
+  ): Array<{ key: string; value: T; distance: number }> {
+    const results: Array<{ key: string; value: T; distance: number }> = [];
+    if (maxDistance < 0) return results;
+
+    const targetLower = target.toLowerCase();
+    const targetLen = targetLower.length;
+
+    // Initial Levenshtein row: [0, 1, 2, ..., targetLen]
+    const initialRow: number[] = new Array(targetLen + 1);
+    for (let i = 0; i <= targetLen; i++) {
+      initialRow[i] = i;
+    }
+
+    this.fuzzyTraverse(this.root, '', initialRow, targetLower, maxDistance, results);
+
+    // Sort by edit distance ascending, then alphabetically by key
+    results.sort((a, b) => a.distance - b.distance || a.key.localeCompare(b.key));
+    return results;
+  }
+
+  private fuzzyTraverse(
+    node: RadixNode<T>,
+    currentPath: string,
+    prevRow: number[],
+    target: string,
+    maxDistance: number,
+    results: Array<{ key: string; value: T; distance: number }>
+  ): void {
+    if (node.isTerminal && node.value !== undefined) {
+      const distance = prevRow[target.length]!;
+      if (distance <= maxDistance) {
+        results.push({ key: currentPath, value: node.value, distance });
+      }
+    }
+
+    for (const [, child] of node.children) {
+      let currentRow = prevRow;
+      const label = child.edgeLabel;
+      let possible = true;
+
+      for (let i = 0; i < label.length; i++) {
+        const ch = label[i]!.toLowerCase();
+        const nextRow = new Array<number>(target.length + 1);
+        nextRow[0] = currentRow[0]! + 1;
+
+        let rowMin = nextRow[0]!;
+        for (let j = 1; j <= target.length; j++) {
+          const cost = ch === target[j - 1] ? 0 : 1;
+          const val = Math.min(
+            nextRow[j - 1]! + 1,       // insertion
+            currentRow[j]! + 1,        // deletion
+            currentRow[j - 1]! + cost  // match or substitution
+          );
+          nextRow[j] = val;
+          if (val < rowMin) rowMin = val;
+        }
+
+        currentRow = nextRow;
+        // Branch pruning: if minimum possible distance in row exceeds threshold, stop
+        if (rowMin > maxDistance) {
+          possible = false;
+          break;
+        }
+      }
+
+      if (possible) {
+        this.fuzzyTraverse(child, currentPath + label, currentRow, target, maxDistance, results);
+      }
+    }
+  }
+
+  /**
    * Returns all entries stored in the tree in alphabetical order.
    */
   public getAll(): Array<{ key: string; value: T }> {
@@ -325,5 +403,28 @@ export class TermDictionary {
    */
   public prefixSearch(prefix: string): TermEntry[] {
     return this.tree.findWithPrefix(prefix).map((e) => e.value);
+  }
+
+  /**
+   * Searches for terms within maxDistance Levenshtein edit distance for typo tolerance.
+   */
+  public fuzzySearch(
+    term: string,
+    maxDistance: number = 2
+  ): Array<{ term: string; entry: TermEntry; distance: number }> {
+    return this.tree.findFuzzy(term, maxDistance).map((m) => ({
+      term: m.key,
+      entry: m.value,
+      distance: m.distance,
+    }));
+  }
+
+  /**
+   * Returns term autocompletions for a given prefix, ranked by popularity (document frequency).
+   */
+  public suggest(prefix: string, limit: number = 5): string[] {
+    const entries = this.prefixSearch(prefix);
+    entries.sort((a, b) => b.docFrequency - a.docFrequency || a.term.localeCompare(b.term));
+    return entries.slice(0, limit).map((e) => e.term);
   }
 }

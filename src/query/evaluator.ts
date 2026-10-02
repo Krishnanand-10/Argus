@@ -1,7 +1,7 @@
 import type { InvertedIndex } from '../index/inverted-index.js';
 import { BM25Scorer } from '../ranking/bm25.js';
 import type { ScoredDocument } from '../ranking/types.js';
-import type { QueryNode, TermNode, PhraseNode, PrefixNode, AndNode, OrNode, NotNode } from './ast.js';
+import type { QueryNode, TermNode, FuzzyNode, PhraseNode, PrefixNode, AndNode, OrNode, NotNode } from './ast.js';
 import { QueryParser } from './parser.js';
 
 export interface SearchOptions {
@@ -13,6 +13,11 @@ export interface SearchOptions {
   snippetLength?: number;
   /** Custom BM25 scorer instance */
   scorer?: BM25Scorer;
+  /**
+   * Typo tolerance: enable automatic fuzzy search when terms have 0 exact matches (default: true).
+   * Can also be a number specifying max edit distance (1 or 2).
+   */
+  fuzzy?: boolean | number;
 }
 
 /**
@@ -47,13 +52,13 @@ export class QueryEvaluator {
     const scorer = options.scorer ?? this.defaultScorer;
 
     // 1. Evaluate matching DocIDs from AST
-    const matchedDocIds = this.evaluateNode(node, index);
+    const matchedDocIds = this.evaluateNode(node, index, options);
     if (matchedDocIds.length === 0) {
       return [];
     }
 
     // 2. Extract scoring terms from the AST
-    const scoringTerms = this.extractScoringTerms(node, index);
+    const scoringTerms = this.extractScoringTerms(node, index, options);
 
     // 3. Rank matching documents via BM25
     const ranked = scorer.rank(matchedDocIds, scoringTerms, index, limit);
@@ -69,12 +74,54 @@ export class QueryEvaluator {
     return ranked;
   }
 
-  private evaluateNode(node: QueryNode, index: InvertedIndex): number[] {
+  private evaluateNode(
+    node: QueryNode,
+    index: InvertedIndex,
+    options?: SearchOptions
+  ): number[] {
     switch (node.type) {
       case 'TERM': {
-        const postings = index.getPostings((node as TermNode).value);
-        if (!postings) return [];
-        return postings.getAll().map((p) => p.docId);
+        const termVal = (node as TermNode).value;
+        const postings = index.getPostings(termVal);
+        if (postings && postings.length > 0) {
+          return postings.getAll().map((p) => p.docId);
+        }
+
+        // Automatic typo tolerance fallback when exact matches are empty
+        if (options?.fuzzy !== false && termVal.length >= 3) {
+          const maxDist =
+            typeof options?.fuzzy === 'number'
+              ? options.fuzzy
+              : termVal.length >= 6
+                ? 2
+                : 1;
+          const matches = index.searchFuzzy(termVal, maxDist);
+          if (matches.length > 0) {
+            const docSet = new Set<number>();
+            for (const m of matches) {
+              for (const p of m.postings) {
+                docSet.add(p.docId);
+              }
+            }
+            return Array.from(docSet).sort((a, b) => a - b);
+          }
+        }
+
+        return [];
+      }
+
+      case 'FUZZY': {
+        const fNode = node as FuzzyNode;
+        const matches = index.searchFuzzy(fNode.term, fNode.maxDistance);
+        if (matches.length === 0) return [];
+
+        const docSet = new Set<number>();
+        for (const m of matches) {
+          for (const p of m.postings) {
+            docSet.add(p.docId);
+          }
+        }
+        return Array.from(docSet).sort((a, b) => a - b);
       }
 
       case 'PHRASE': {
@@ -102,10 +149,10 @@ export class QueryEvaluator {
         const children = (node as AndNode).children;
         if (children.length === 0) return [];
 
-        let current = this.evaluateNode(children[0]!, index);
+        let current = this.evaluateNode(children[0]!, index, options);
         for (let i = 1; i < children.length; i++) {
           if (current.length === 0) break;
-          const next = new Set(this.evaluateNode(children[i]!, index));
+          const next = new Set(this.evaluateNode(children[i]!, index, options));
           current = current.filter((id) => next.has(id));
         }
         return current;
@@ -117,7 +164,7 @@ export class QueryEvaluator {
 
         const docSet = new Set<number>();
         for (const child of children) {
-          const docs = this.evaluateNode(child, index);
+          const docs = this.evaluateNode(child, index, options);
           for (const d of docs) {
             docSet.add(d);
           }
@@ -126,7 +173,7 @@ export class QueryEvaluator {
       }
 
       case 'NOT': {
-        const excluded = new Set(this.evaluateNode((node as NotNode).child, index));
+        const excluded = new Set(this.evaluateNode((node as NotNode).child, index, options));
         const allDocIds = index.getDocumentIds();
         return allDocIds.filter((id) => !excluded.has(id));
       }
@@ -136,19 +183,60 @@ export class QueryEvaluator {
     }
   }
 
-  private extractScoringTerms(node: QueryNode, index: InvertedIndex): string[] {
+  private extractScoringTerms(
+    node: QueryNode,
+    index: InvertedIndex,
+    options?: SearchOptions
+  ): string[] {
     const terms = new Set<string>();
 
     const traverse = (n: QueryNode) => {
       switch (n.type) {
-        case 'TERM':
-          terms.add((n as TermNode).value);
+        case 'TERM': {
+          const val = (n as TermNode).value;
+          const postings = index.getPostings(val);
+          if (postings && postings.length > 0) {
+            terms.add(val);
+          } else if (options?.fuzzy !== false && val.length >= 3) {
+            const maxDist =
+              typeof options?.fuzzy === 'number'
+                ? options.fuzzy
+                : val.length >= 6
+                  ? 2
+                  : 1;
+            const matches = index.searchFuzzy(val, maxDist);
+            if (matches.length > 0) {
+              for (const m of matches) {
+                terms.add(m.term);
+              }
+            } else {
+              terms.add(val);
+            }
+          } else {
+            terms.add(val);
+          }
           break;
+        }
+
+        case 'FUZZY': {
+          const fNode = n as FuzzyNode;
+          const matches = index.searchFuzzy(fNode.term, fNode.maxDistance);
+          if (matches.length > 0) {
+            for (const m of matches) {
+              terms.add(m.term);
+            }
+          } else {
+            terms.add(fNode.term);
+          }
+          break;
+        }
+
         case 'PHRASE':
           for (const t of (n as PhraseNode).terms) {
             terms.add(t);
           }
           break;
+
         case 'PREFIX': {
           const matches = index.searchPrefix((n as PrefixNode).prefix);
           for (const m of matches) {
@@ -156,12 +244,14 @@ export class QueryEvaluator {
           }
           break;
         }
+
         case 'AND':
         case 'OR':
           for (const child of (n as AndNode | OrNode).children) {
             traverse(child);
           }
           break;
+
         case 'NOT':
           // Excluded terms do not contribute positive score
           break;
@@ -183,40 +273,88 @@ export class QueryEvaluator {
     const text =
       (doc.fields['body'] as string) ||
       (doc.fields['text'] as string) ||
+      (doc.fields['content'] as string) ||
       (doc.fields['title'] as string) ||
       '';
 
     if (text.length === 0) return undefined;
 
-    // Find first occurrence of any query term
-    const lower = text.toLowerCase();
-    let firstIndex = -1;
+    const lowerText = text.toLowerCase();
+    const cleanTerms = terms
+      .map((t) => t.trim().toLowerCase())
+      .filter((t) => t.length > 1);
 
-    for (const term of terms) {
-      const idx = lower.indexOf(term.toLowerCase());
-      if (idx !== -1 && (firstIndex === -1 || idx < firstIndex)) {
-        firstIndex = idx;
-      }
-    }
-
-    if (firstIndex === -1) {
+    if (cleanTerms.length === 0) {
       return text.length > maxChars ? text.slice(0, maxChars) + '...' : text;
     }
 
-    // Window around match
-    const half = Math.floor(maxChars / 2);
-    const start = Math.max(0, firstIndex - half);
-    const end = Math.min(text.length, start + maxChars);
+    // Identify match positions in text
+    let bestStart = -1;
+    let maxDensity = 0;
+    const matchIndices: number[] = [];
 
-    let snippet = text.slice(start, end);
+    for (const term of cleanTerms) {
+      let idx = lowerText.indexOf(term);
+      while (idx !== -1) {
+        matchIndices.push(idx);
+        idx = lowerText.indexOf(term, idx + term.length);
+        if (matchIndices.length > 25) break;
+      }
+    }
+
+    // If exact occurrences not found, check prefix match (stem)
+    if (matchIndices.length === 0) {
+      for (const term of cleanTerms) {
+        const prefix = term.slice(0, Math.min(term.length, 4));
+        const idx = lowerText.indexOf(prefix);
+        if (idx !== -1) {
+          matchIndices.push(idx);
+          break;
+        }
+      }
+    }
+
+    if (matchIndices.length > 0) {
+      matchIndices.sort((a, b) => a - b);
+      for (let i = 0; i < matchIndices.length; i++) {
+        const startCand = matchIndices[i]!;
+        const endCand = startCand + maxChars;
+        let count = 0;
+        for (let j = i; j < matchIndices.length; j++) {
+          if (matchIndices[j]! <= endCand) count++;
+          else break;
+        }
+        if (count > maxDensity) {
+          maxDensity = count;
+          bestStart = startCand;
+        }
+      }
+    }
+
+    let start = 0;
+    let end = Math.min(text.length, maxChars);
+
+    if (bestStart !== -1) {
+      const half = Math.floor(maxChars / 2);
+      start = Math.max(0, bestStart - half);
+      end = Math.min(text.length, start + maxChars);
+    }
+
+    let snippet = text.slice(start, end).trim();
     if (start > 0) snippet = '...' + snippet;
     if (end < text.length) snippet = snippet + '...';
 
-    // Highlight terms with markdown bold **term**
-    for (const term of terms) {
-      const regex = new RegExp(`\\b(${escapeRegex(term)})\\b`, 'gi');
-      snippet = snippet.replace(regex, '**$1**');
+    // Highlight matched words (including word stems)
+    for (const term of cleanTerms) {
+      const escaped = escapeRegex(term);
+      const regex = new RegExp(`\\b(${escaped}\\w*)\\b`, 'gi');
+      snippet = snippet.replace(regex, (match) => {
+        return match.startsWith('**') ? match : `**${match}**`;
+      });
     }
+
+    // Clean up any nested/overlapping bolds
+    snippet = snippet.replace(/\*{4,}/g, '**');
 
     return snippet;
   }

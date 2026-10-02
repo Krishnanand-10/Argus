@@ -80,6 +80,13 @@ export class ArgusEngine {
   }
 
   /**
+   * Returns autocomplete suggestions for a given term prefix, ranked by frequency.
+   */
+  public suggest(prefix: string, limit: number = 5): string[] {
+    return this.index.suggest(prefix, limit);
+  }
+
+  /**
    * Serializes and persists the active index to an .argus binary file on disk.
    */
   public async commit(filePath: string): Promise<void> {

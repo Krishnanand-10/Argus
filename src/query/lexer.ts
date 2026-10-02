@@ -3,6 +3,7 @@
  */
 export type QueryTokenType =
   | 'TERM'
+  | 'FUZZY'
   | 'PHRASE'
   | 'PREFIX'
   | 'AND'
@@ -19,6 +20,7 @@ export interface QueryToken {
   type: QueryTokenType;
   value: string;
   position: number;
+  distance?: number;
 }
 
 /**
@@ -146,6 +148,19 @@ export function tokenizeQuery(query: string): QueryToken[] {
       tokens.push({
         type: 'PREFIX',
         value: word.slice(0, -1),
+        position: startPos,
+      });
+    } else if (word.includes('~') && word.indexOf('~') > 0) {
+      // Fuzzy term: computr~ or computr~2
+      const tildeIdx = word.indexOf('~');
+      const baseTerm = word.slice(0, tildeIdx);
+      const distStr = word.slice(tildeIdx + 1);
+      const parsedDist = distStr.length > 0 && /^\d+$/.test(distStr) ? parseInt(distStr, 10) : 2;
+      const distance = Math.min(Math.max(1, parsedDist), 4);
+      tokens.push({
+        type: 'FUZZY',
+        value: baseTerm,
+        distance,
         position: startPos,
       });
     } else {

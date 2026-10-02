@@ -4,6 +4,7 @@
 
 export type QueryNodeType =
   | 'TERM'
+  | 'FUZZY'
   | 'PHRASE'
   | 'PREFIX'
   | 'AND'
@@ -13,6 +14,12 @@ export type QueryNodeType =
 export interface TermNode {
   type: 'TERM';
   value: string;
+}
+
+export interface FuzzyNode {
+  type: 'FUZZY';
+  term: string;
+  maxDistance: number;
 }
 
 export interface PhraseNode {
@@ -43,8 +50,10 @@ export interface NotNode {
 
 export type QueryNode =
   | TermNode
+  | FuzzyNode
   | PhraseNode
   | PrefixNode
   | AndNode
   | OrNode
   | NotNode;
+

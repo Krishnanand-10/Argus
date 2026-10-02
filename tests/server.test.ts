@@ -152,5 +152,15 @@ describe('Server & CLI Suite', () => {
       expect(searchData.totalResults).toBe(1);
       expect(searchData.results[0].snippet).toContain('**topological**');
     });
+
+    it('returns term autocompletions at GET /api/suggest', async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/suggest?q=con&limit=3`);
+      expect(res.status).toBe(200);
+
+      const data = await res.json();
+      expect(data.query).toBe('con');
+      expect(Array.isArray(data.suggestions)).toBe(true);
+      expect(data.suggestions.length).toBeGreaterThan(0);
+    });
   });
 });

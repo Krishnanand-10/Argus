@@ -110,6 +110,17 @@ export class ArgusServer {
       return;
     }
 
+    // Route: GET /api/suggest?q=...&limit=...
+    if (method === 'GET' && pathname === '/api/suggest') {
+      const q = parsedUrl.searchParams.get('q') || '';
+      const limit = parseInt(parsedUrl.searchParams.get('limit') || '5', 10);
+      const suggestions = q.length > 0 ? this.engine.suggest(q, limit) : [];
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ query: q, suggestions }));
+      return;
+    }
+
     // Route: GET /api/stats
     if (method === 'GET' && pathname === '/api/stats') {
       const stats = this.engine.getStats();
@@ -403,22 +414,72 @@ export class ArgusServer {
       border-radius: 4px;
       font-family: monospace;
     }
+    .suggest-container {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+      flex-wrap: wrap;
+      min-height: 1.2rem;
+    }
+    .suggest-chip {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--primary);
+      padding: 0.15rem 0.55rem;
+      border-radius: 9999px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      transition: all 0.15s ease;
+    }
+    .suggest-chip:hover {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--primary);
+    }
     .result-snippet {
       font-size: 0.95rem;
       color: #cbd5e1;
       line-height: 1.5;
     }
     .result-snippet b, .result-snippet strong {
-      color: #0b1120;
-      background: var(--highlight);
-      padding: 0.1rem 0.25rem;
-      border-radius: 2px;
+      color: #f59e0b;
+      background: rgba(245, 158, 11, 0.18);
+      border-bottom: 2px solid rgba(245, 158, 11, 0.6);
+      padding: 0.05rem 0.3rem;
+      border-radius: 4px;
+      font-weight: 600;
     }
     .result-meta {
       font-size: 0.8rem;
       color: var(--muted);
       display: flex;
       gap: 0.75rem;
+      align-items: center;
+    }
+    .details-toggle {
+      background: none;
+      border: none;
+      color: var(--primary);
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 0;
+      text-decoration: underline;
+    }
+    .full-doc-view {
+      margin-top: 0.5rem;
+      padding: 0.75rem;
+      background: #0b1120;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: #94a3b8;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 250px;
+      overflow-y: auto;
+      display: none;
     }
     .empty-state {
       text-align: center;
@@ -442,7 +503,7 @@ export class ArgusServer {
     <div class="upload-box" id="dropZone" onclick="document.getElementById('fileInput').click()">
       <div class="upload-icon">📂</div>
       <div class="upload-title">Drop your documents here, or click to browse</div>
-      <div class="upload-sub">Supports Markdown (.md), Plaintext (.txt), JSON (.json), and CSV</div>
+      <div class="upload-sub">Supports Markdown (.md), Plaintext (.txt), JSON (.json), and Code</div>
       <div class="upload-status" id="uploadStatus"></div>
       <input type="file" id="fileInput" multiple style="display:none;" />
     </div>
@@ -453,8 +514,11 @@ export class ArgusServer {
       <button onclick="executeSearch()">Search</button>
     </div>
 
+    <!-- Live Autocomplete Suggestion Chips -->
+    <div class="suggest-container" id="suggestBox"></div>
+
     <div class="query-help">
-      Supports Boolean (<code>AND</code>, <code>OR</code>, <code>NOT</code>), exact phrases (<code>"byzantine fault tolerance"</code>), prefixes (<code>distrib*</code>), and grouping (<code>(paxos OR raft) AND consensus</code>).
+      Supports Boolean (<code>AND</code>, <code>OR</code>, <code>NOT</code>), exact phrases (<code>"byzantine fault tolerance"</code>), prefixes (<code>distrib*</code>), fuzzy typos (<code>computr~</code>), and grouping. Press <kbd style="background:var(--card); padding:0.1rem 0.3rem; border-radius:3px; border:1px solid var(--border);">/</kbd> to focus.
     </div>
 
     <div id="meta" style="font-size:0.85rem; color:var(--muted); display:none;"></div>
@@ -468,10 +532,58 @@ export class ArgusServer {
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
     const uploadStatus = document.getElementById('uploadStatus');
+    const suggestBox = document.getElementById('suggestBox');
 
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') executeSearch();
     });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === '/' && document.activeElement !== input) {
+        e.preventDefault();
+        input.focus();
+      }
+      if (e.key === 'Escape' && document.activeElement === input) {
+        input.blur();
+      }
+    });
+
+    let debounceTimer;
+    input.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      const q = input.value.trim();
+      if (q.length < 2) {
+        suggestBox.innerHTML = '';
+        return;
+      }
+      debounceTimer = setTimeout(async () => {
+        try {
+          const lastWord = q.split(/\\s+/).pop() || '';
+          if (lastWord.length < 2 || lastWord.includes('*') || lastWord.includes('"')) {
+            suggestBox.innerHTML = '';
+            return;
+          }
+          const res = await fetch('/api/suggest?q=' + encodeURIComponent(lastWord) + '&limit=4');
+          const data = await res.json();
+          if (data.suggestions && data.suggestions.length > 0) {
+            suggestBox.innerHTML =
+              '<span style="font-size:0.75rem;">Suggestions:</span> ' +
+              data.suggestions.map(s => \`<span class="suggest-chip" onclick="applySuggestion('\${s}')">\${s}</span>\`).join('');
+          } else {
+            suggestBox.innerHTML = '';
+          }
+        } catch {}
+      }, 100);
+    });
+
+    function applySuggestion(term) {
+      const words = input.value.trim().split(/\\s+/);
+      words[words.length - 1] = term;
+      input.value = words.join(' ') + ' ';
+      suggestBox.innerHTML = '';
+      input.focus();
+      executeSearch();
+    }
 
     // Drag and Drop Handling
     ['dragenter', 'dragover'].forEach(event => {
@@ -549,6 +661,7 @@ export class ArgusServer {
       const q = input.value.trim();
       if (!q) return;
 
+      suggestBox.innerHTML = '';
       const meta = document.getElementById('meta');
       const resultsDiv = document.getElementById('results');
 
@@ -566,11 +679,13 @@ export class ArgusServer {
           return;
         }
 
-        resultsDiv.innerHTML = data.results.map((item) => {
+        resultsDiv.innerHTML = data.results.map((item, idx) => {
           const title = (item.fields && item.fields.title) ? item.fields.title : ('Document #' + item.docId);
           const snippetHtml = item.snippet
             ? item.snippet.replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>')
             : 'No snippet available';
+
+          const docJson = item.fields ? JSON.stringify(item.fields, null, 2) : 'No stored fields';
 
           return \`
             <div class="result-card">
@@ -582,12 +697,21 @@ export class ArgusServer {
               <div class="result-meta">
                 <span>DocID: \${item.docId}</span>
                 \${item.matchedTerms && item.matchedTerms.length ? '<span>Matched: ' + item.matchedTerms.join(', ') + '</span>' : ''}
+                <button class="details-toggle" onclick="toggleDetails(\${idx})">View Document</button>
               </div>
+              <pre class="full-doc-view" id="doc-view-\${idx}">\${docJson}</pre>
             </div>
           \`;
         }).join('');
       } catch (err) {
         meta.textContent = 'Search failed: ' + err.message;
+      }
+    }
+
+    function toggleDetails(idx) {
+      const el = document.getElementById('doc-view-' + idx);
+      if (el) {
+        el.style.display = el.style.display === 'block' ? 'none' : 'block';
       }
     }
   </script>

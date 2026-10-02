@@ -1,4 +1,4 @@
-import type { QueryNode, AndNode, OrNode, NotNode, TermNode, PhraseNode, PrefixNode } from './ast.js';
+import type { QueryNode, AndNode, OrNode, NotNode, TermNode, FuzzyNode, PhraseNode, PrefixNode } from './ast.js';
 import { tokenizeQuery, type QueryToken, type QueryTokenType } from './lexer.js';
 
 /**
@@ -111,6 +111,15 @@ export class QueryParser {
       } as PrefixNode;
     }
 
+    if (this.match('FUZZY')) {
+      const token = this.consume();
+      return {
+        type: 'FUZZY',
+        term: token.value,
+        maxDistance: token.distance ?? 2,
+      } as FuzzyNode;
+    }
+
     if (this.match('TERM')) {
       const token = this.consume();
       return {
@@ -138,6 +147,7 @@ export class QueryParser {
     return (
       type === 'AND' ||
       type === 'TERM' ||
+      type === 'FUZZY' ||
       type === 'PHRASE' ||
       type === 'PREFIX' ||
       type === 'NOT' ||

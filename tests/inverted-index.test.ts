@@ -388,5 +388,38 @@ describe('Phase 2: Inverted Index & Positional Postings', () => {
       expect(prefixResults.length).toBeGreaterThan(0);
       expect(prefixResults.some((e) => e.term.startsWith('distrib'))).toBe(true);
     });
+
+    it('performs fuzzy search with typo tolerance and Levenshtein pruning', () => {
+      const index = new InvertedIndex();
+      index.addDocuments([
+        { id: 1, text: 'Computer architecture and database consensus.' },
+        { id: 2, text: 'Algorithm design and dynamic programming.' },
+      ]);
+
+      // Typo: 'computr' (missing 'e') -> matches 'comput'
+      const fuzzyMatches = index.searchFuzzy('computr', 2);
+      expect(fuzzyMatches.length).toBeGreaterThan(0);
+      expect(fuzzyMatches[0]!.term).toBe('comput');
+      expect(fuzzyMatches[0]!.postings.hasDoc(1)).toBe(true);
+
+      // Typo: 'algoritm' (missing 'h') -> matches 'algorithm' (or stem 'algorithm')
+      const algoMatches = index.searchFuzzy('algoritm', 2);
+      expect(algoMatches.length).toBeGreaterThan(0);
+      expect(algoMatches[0]!.postings.hasDoc(2)).toBe(true);
+    });
+
+    it('provides popularity-ranked autocomplete suggestions', () => {
+      const index = new InvertedIndex();
+      index.addDocuments([
+        { id: 1, text: 'Distribution of distributed distributions.' },
+        { id: 2, text: 'Distributed consensus algorithm.' },
+        { id: 3, text: 'Distinct structures.' },
+      ]);
+
+      const suggestions = index.suggest('dist', 5);
+      expect(suggestions.length).toBeGreaterThan(0);
+      expect(suggestions[0]).toBe('distribut');
+    });
   });
 });
+

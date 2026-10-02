@@ -16,7 +16,7 @@ interface CliArgs {
   help?: boolean;
 }
 
-const KNOWN_COMMANDS = new Set(['index', 'search', 'stats', 'serve', 'help']);
+const KNOWN_COMMANDS = new Set(['index', 'search', 'stats', 'serve', 'watch', 'help']);
 
 /**
  * Searches for an existing .argus binary index in the current directory.
@@ -91,6 +91,9 @@ export function parseArgs(args: string[]): CliArgs {
         }
       } else if (result.command === 'stats') {
         if (!result.index && positional[1]) result.index = positional[1];
+      } else if (result.command === 'watch') {
+        if (!result.source && positional[1]) result.source = positional[1];
+        if (!result.output && positional[2]) result.output = positional[2];
       }
     } else {
       // Shorthand: running `argus "search query"` directly defaults to search
@@ -129,6 +132,9 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<vo
       break;
     case 'serve':
       await handleServe(args);
+      break;
+    case 'watch':
+      await handleWatch(args);
       break;
     default:
       console.error(`Unknown command: ${args.command}`);
@@ -213,9 +219,13 @@ async function handleSearch(args: CliArgs): Promise<void> {
   for (let i = 0; i < results.length; i++) {
     const r = results[i]!;
     const title = (r.fields && (r.fields['title'] as string)) || `Document #${r.docId}`;
-    console.log(`${i + 1}. [BM25: ${r.score.toFixed(4)}] ${title} (DocID: ${r.docId})`);
+    console.log(`\x1b[1;36m${i + 1}.\x1b[0m [\x1b[32mBM25: ${r.score.toFixed(4)}\x1b[0m] \x1b[1m${title}\x1b[0m (DocID: ${r.docId})`);
     if (r.snippet) {
-      console.log(`   ${r.snippet}`);
+      const colored = r.snippet.replace(/\*\*(.*?)\*\*/g, '\x1b[1;33m$1\x1b[0m');
+      console.log(`   ${colored}`);
+    }
+    if (r.matchedTerms && r.matchedTerms.length > 0) {
+      console.log(`   \x1b[2mMatched: ${r.matchedTerms.join(', ')}\x1b[0m`);
     }
     console.log('');
   }
@@ -272,6 +282,66 @@ async function handleServe(args: CliArgs): Promise<void> {
   console.log(`Press Ctrl+C to stop the server.`);
 }
 
+async function handleWatch(args: CliArgs): Promise<void> {
+  const sourceInput = args.source ?? './';
+  const sourcePath = path.resolve(sourceInput);
+  let outputInput = args.output;
+  if (!outputInput) {
+    const base = path.basename(sourcePath);
+    outputInput = base && base !== '.' ? `./${base}.argus` : './index.argus';
+  }
+  const outputPath = path.resolve(outputInput);
+
+  console.log(`\n👀 [Argus Live Watch Mode]`);
+  console.log(`📁 Source directory: ${sourcePath}`);
+  console.log(`💾 Live target index: ${outputPath}\n`);
+
+  // Initial build
+  await handleIndex(args);
+
+  console.log(`⚡ Actively watching for file edits. Press Ctrl+C to stop.`);
+
+  let debounceTimer: NodeJS.Timeout | null = null;
+  fs.watch(sourcePath, { recursive: true }, (eventType, filename) => {
+    if (!filename) return;
+    const lower = filename.toLowerCase();
+    if (lower.endsWith('.argus') || lower.endsWith('.wal') || lower.includes('node_modules') || lower.includes('.git')) {
+      return;
+    }
+
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(async () => {
+      console.log(`\n🔄 [${eventType}] Detected change in: ${filename}`);
+      const start = performance.now();
+      try {
+        const documents = await collectDocuments(sourcePath);
+        const engine = new ArgusEngine();
+        await engine.addDocuments(documents);
+        await engine.commit(outputPath);
+        const elapsed = (performance.now() - start).toFixed(1);
+        console.log(`⚡ Re-indexed ${documents.length} document(s) in ${elapsed}ms!`);
+      } catch (err: any) {
+        console.error('Failed to update index:', err.message);
+      }
+    }, 250);
+  });
+}
+
+const SUPPORTED_TEXT_EXTS = new Set([
+  '.txt', '.md', '.markdown', '.rst', '.csv', '.tsv', '.log',
+  '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs',
+  '.py', '.rs', '.go', '.java', '.c', '.cpp', '.h', '.hpp',
+  '.cs', '.rb', '.php', '.swift', '.kt',
+  '.html', '.css', '.scss', '.yaml', '.yml', '.toml', '.sql',
+  '.sh', '.bash', '.zsh', '.env'
+]);
+
+const IGNORED_DIRS = new Set([
+  'node_modules', '.git', 'dist', 'build', 'out', 'target',
+  '.next', '.nuxt', '.turbo', '__pycache__', '.venv', 'venv',
+  '.idea', '.vscode', '.cache', '.argus'
+]);
+
 async function collectDocuments(targetPath: string): Promise<IndexableDocument[]> {
   const documents: IndexableDocument[] = [];
   let nextDocId = 1;
@@ -280,11 +350,13 @@ async function collectDocuments(targetPath: string): Promise<IndexableDocument[]
     const stat = await fs.promises.stat(dirOrFile);
 
     if (stat.isFile()) {
+      if (stat.size > 5 * 1024 * 1024) return; // Skip files > 5MB
+
       const ext = path.extname(dirOrFile).toLowerCase();
-      const content = await fs.promises.readFile(dirOrFile, 'utf-8');
 
       if (ext === '.json') {
         try {
+          const content = await fs.promises.readFile(dirOrFile, 'utf-8');
           const parsed = JSON.parse(content);
           if (Array.isArray(parsed)) {
             for (const item of parsed) {
@@ -302,18 +374,30 @@ async function collectDocuments(targetPath: string): Promise<IndexableDocument[]
         } catch {
           // Skip invalid JSON
         }
-      } else if (ext === '.md' || ext === '.txt') {
-        const basename = path.basename(dirOrFile, ext);
-        documents.push({
-          id: nextDocId++,
-          title: basename,
-          body: content,
-        });
+      } else if (SUPPORTED_TEXT_EXTS.has(ext)) {
+        try {
+          const content = await fs.promises.readFile(dirOrFile, 'utf-8');
+          if (content.includes('\0')) return; // Skip binary files
+
+          const relPath = path.relative(targetPath, dirOrFile) || path.basename(dirOrFile);
+          documents.push({
+            id: nextDocId++,
+            title: relPath,
+            body: content,
+          });
+        } catch {
+          // Skip unreadable files
+        }
       }
     } else if (stat.isDirectory()) {
+      const dirName = path.basename(dirOrFile);
+      if (IGNORED_DIRS.has(dirName) || (dirName.startsWith('.') && dirName !== '.' && dirName !== '..')) {
+        return;
+      }
+
       const entries = await fs.promises.readdir(dirOrFile);
       for (const entry of entries) {
-        if (!entry.startsWith('.')) {
+        if (!entry.startsWith('.') && !IGNORED_DIRS.has(entry)) {
           await walk(path.join(dirOrFile, entry));
         }
       }
@@ -330,11 +414,18 @@ function printHelp(): void {
 
 DEAD SIMPLE USAGE:
   argus                         Start the Web UI immediately at http://localhost:8080
-  argus index <folder>          Index any folder (e.g. 'argus index ./my-docs')
+  argus index <folder>          Index any folder of documents/code (e.g. 'argus index ./src')
+  argus watch <folder>          Watch folder and auto re-index on file changes
   argus search "<query>"        Search your documents (e.g. 'argus search "consensus"')
   argus "<query>"               Direct search shorthand (e.g. 'argus "machine learning"')
   argus stats                   View index statistics
   argus serve [port]            Start web UI / API server (default: port 8080)
+
+SEARCH SYNTAX:
+  Exact phrases:                "byzantine fault tolerance"
+  Boolean expressions:          distributed AND (consensus OR raft) NOT centralized
+  Prefix / Wildcards:           distrib*
+  Typo tolerance (fuzzy):       computr~ or algoritm~1
 
 OPTIONS:
   --source <path>               Folder or file to index
@@ -346,6 +437,7 @@ OPTIONS:
 
 EXAMPLES:
   argus index ./notes           (Indexes ./notes into ./notes.argus)
+  argus watch ./notes           (Auto re-indexes whenever files are modified)
   argus "fault tolerance"       (Searches for exact phrase)
   argus serve 3000              (Starts Web UI on port 3000)
 `);
