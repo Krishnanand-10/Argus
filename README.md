@@ -306,10 +306,10 @@ Argus/
   - [x] Architectural documentation & binary format specification
   - [x] Character normalization & Unicode word tokenizer
   - [x] Porter Stemming algorithm & stopword filter
-- [ ] **Phase 2: Inverted Index & Positional Postings**
-  - [ ] Term Dictionary (Trie / Radix Tree)
-  - [ ] Positional postings list with Term Frequency and offsets
-  - [ ] Skip lists for accelerated list intersections
+- [x] **Phase 2: Inverted Index & Positional Postings**
+  - [x] Term Dictionary (Trie / Radix Tree)
+  - [x] Positional postings list with Term Frequency and offsets
+  - [x] Skip lists for accelerated list intersections
 - [ ] **Phase 3: Binary Storage & Compression**
   - [ ] Variable-Byte (Varint) codec with bitwise operations
   - [ ] Delta encoding (d-gaps) for DocIDs and positions
