@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as zlib from 'node:zlib';
 import { ArgusEngine } from './engine.js';
 import { ArgusServer } from './server/server.js';
 import { readIndexHeader } from './storage/deserializer.js';
@@ -151,8 +152,10 @@ async function handleIndex(args: CliArgs): Promise<void> {
 
   let outputInput = args.output;
   if (!outputInput) {
-    // If indexing a folder, name it after the folder: ./my-folder.argus
-    const base = path.basename(sourcePath);
+    const isFile = fs.existsSync(sourcePath) && fs.statSync(sourcePath).isFile();
+    const base = isFile
+      ? path.basename(sourcePath, path.extname(sourcePath))
+      : path.basename(sourcePath);
     outputInput = base && base !== '.' ? `./${base}.argus` : './index.argus';
   }
   const outputPath = path.resolve(outputInput);
@@ -342,6 +345,41 @@ const IGNORED_DIRS = new Set([
   '.idea', '.vscode', '.cache', '.argus'
 ]);
 
+/**
+ * Extracts plain text from Microsoft Office OpenXML files (.pptx slides, .docx document).
+ * Uses Node's built-in zlib for zero-dependency zip parsing.
+ */
+function extractOfficeXmlText(buffer: Buffer, filePattern: RegExp): string {
+  let pos = 0;
+  const texts: string[] = [];
+  while (pos < buffer.length - 30) {
+    if (buffer.readUInt32LE(pos) === 0x04034b50) {
+      const method = buffer.readUInt16LE(pos + 8);
+      const compSize = buffer.readUInt32LE(pos + 18);
+      const nameLen = buffer.readUInt16LE(pos + 26);
+      const extraLen = buffer.readUInt16LE(pos + 28);
+      const name = buffer.subarray(pos + 30, pos + 30 + nameLen).toString('utf-8');
+      const dataStart = pos + 30 + nameLen + extraLen;
+
+      if (filePattern.test(name)) {
+        const compressed = buffer.subarray(dataStart, dataStart + compSize);
+        try {
+          const raw = method === 8 ? zlib.inflateRawSync(compressed) : compressed;
+          const xml = raw.toString('utf-8');
+          const cleanText = xml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+          if (cleanText.length > 0) texts.push(cleanText);
+        } catch {
+          // ignore stream parse errors
+        }
+      }
+      pos = dataStart + compSize;
+    } else {
+      pos++;
+    }
+  }
+  return texts.join(' ');
+}
+
 async function collectDocuments(targetPath: string): Promise<IndexableDocument[]> {
   const documents: IndexableDocument[] = [];
   let nextDocId = 1;
@@ -350,11 +388,41 @@ async function collectDocuments(targetPath: string): Promise<IndexableDocument[]
     const stat = await fs.promises.stat(dirOrFile);
 
     if (stat.isFile()) {
-      if (stat.size > 5 * 1024 * 1024) return; // Skip files > 5MB
+      if (stat.size > 20 * 1024 * 1024) return; // Skip files > 20MB
 
       const ext = path.extname(dirOrFile).toLowerCase();
 
-      if (ext === '.json') {
+      if (ext === '.pptx') {
+        try {
+          const buffer = await fs.promises.readFile(dirOrFile);
+          const slideText = extractOfficeXmlText(buffer, /ppt\/slides\/slide\d+\.xml/i);
+          if (slideText.length > 0) {
+            const relPath = path.relative(targetPath, dirOrFile) || path.basename(dirOrFile);
+            documents.push({
+              id: nextDocId++,
+              title: relPath,
+              body: slideText,
+            });
+          }
+        } catch {
+          // Skip unreadable PPTX
+        }
+      } else if (ext === '.docx') {
+        try {
+          const buffer = await fs.promises.readFile(dirOrFile);
+          const docText = extractOfficeXmlText(buffer, /word\/document\.xml/i);
+          if (docText.length > 0) {
+            const relPath = path.relative(targetPath, dirOrFile) || path.basename(dirOrFile);
+            documents.push({
+              id: nextDocId++,
+              title: relPath,
+              body: docText,
+            });
+          }
+        } catch {
+          // Skip unreadable DOCX
+        }
+      } else if (ext === '.json') {
         try {
           const content = await fs.promises.readFile(dirOrFile, 'utf-8');
           const parsed = JSON.parse(content);
