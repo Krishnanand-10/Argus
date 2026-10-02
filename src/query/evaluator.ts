@@ -88,17 +88,22 @@ export class QueryEvaluator {
         }
 
         // Automatic typo tolerance fallback when exact matches are empty
-        if (options?.fuzzy !== false && termVal.length >= 3) {
+        if (options?.fuzzy !== false && termVal.length >= 4) {
           const maxDist =
             typeof options?.fuzzy === 'number'
               ? options.fuzzy
-              : termVal.length >= 6
+              : termVal.length >= 8
                 ? 2
                 : 1;
           const matches = index.searchFuzzy(termVal, maxDist);
           if (matches.length > 0) {
+            // Pick lowest edit distance tier (prefer 1-edit over 2-edits)
+            matches.sort((a, b) => a.distance - b.distance);
+            const bestDist = matches[0]!.distance;
+            const topMatches = matches.filter((m) => m.distance === bestDist).slice(0, 3);
+
             const docSet = new Set<number>();
-            for (const m of matches) {
+            for (const m of topMatches) {
               for (const p of m.postings) {
                 docSet.add(p.docId);
               }
@@ -197,16 +202,19 @@ export class QueryEvaluator {
           const postings = index.getPostings(val);
           if (postings && postings.length > 0) {
             terms.add(val);
-          } else if (options?.fuzzy !== false && val.length >= 3) {
+          } else if (options?.fuzzy !== false && val.length >= 4) {
             const maxDist =
               typeof options?.fuzzy === 'number'
                 ? options.fuzzy
-                : val.length >= 6
+                : val.length >= 8
                   ? 2
                   : 1;
             const matches = index.searchFuzzy(val, maxDist);
             if (matches.length > 0) {
-              for (const m of matches) {
+              matches.sort((a, b) => a.distance - b.distance);
+              const bestDist = matches[0]!.distance;
+              const topMatches = matches.filter((m) => m.distance === bestDist).slice(0, 3);
+              for (const m of topMatches) {
                 terms.add(m.term);
               }
             } else {

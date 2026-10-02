@@ -28,19 +28,35 @@ export function autoDetectIndex(specifiedPath?: string): string | null {
     return fs.existsSync(resolved) ? resolved : null;
   }
 
-  const commonNames = ['library.argus', 'docs.argus', 'index.argus'];
+  // Scan current directory for *.argus files and pick the most recently modified
+  try {
+    const cwd = process.cwd();
+    const files = fs.readdirSync(cwd);
+    const argusFiles = files
+      .filter((f) => f.endsWith('.argus'))
+      .map((f) => {
+        try {
+          const full = path.join(cwd, f);
+          const stat = fs.statSync(full);
+          return { path: full, mtime: stat.mtimeMs };
+        } catch {
+          return null;
+        }
+      })
+      .filter((entry): entry is { path: string; mtime: number } => entry !== null)
+      .sort((a, b) => b.mtime - a.mtime);
+
+    if (argusFiles.length > 0) {
+      return argusFiles[0]!.path;
+    }
+  } catch {
+    // Ignore directory scan errors
+  }
+
+  const commonNames = ['index.argus', 'library.argus', 'docs.argus'];
   for (const name of commonNames) {
     const candidate = path.resolve(name);
     if (fs.existsSync(candidate)) return candidate;
-  }
-
-  // Scan current directory for any *.argus file
-  try {
-    const files = fs.readdirSync(process.cwd());
-    const argusFile = files.find((f) => f.endsWith('.argus'));
-    if (argusFile) return path.resolve(argusFile);
-  } catch {
-    // Ignore directory scan errors
   }
 
   return null;
