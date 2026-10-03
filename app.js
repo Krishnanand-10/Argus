@@ -622,6 +622,52 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Bind Personal File Upload in demo
+  const demoUploadBtn = document.getElementById('btn-demo-upload');
+  const demoFileInput = document.getElementById('demo-file-input');
+
+  if (demoUploadBtn && demoFileInput) {
+    demoUploadBtn.addEventListener('click', () => {
+      demoFileInput.click();
+    });
+
+    demoFileInput.addEventListener('change', async (e) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+
+      let added = 0;
+      let firstTerm = '';
+      for (const file of files) {
+        try {
+          const content = await file.text();
+          if (content.includes('\0')) continue;
+          engine.addDocument({
+            id: engine.documents.size + 1,
+            title: file.name,
+            path: `personal/${file.name}`,
+            body: content,
+          });
+          added++;
+          if (!firstTerm) {
+            const toks = tokenize(file.name);
+            if (toks.length > 0) firstTerm = toks[0].raw;
+          }
+        } catch (err) {
+          console.warn(err);
+        }
+      }
+
+      if (added > 0) {
+        showToast(`Indexed ${added} personal file${added > 1 ? 's' : ''}!`);
+        if (firstTerm && searchInput) {
+          searchInput.value = firstTerm;
+        }
+        executeSearch(searchInput ? searchInput.value : '');
+      }
+      demoFileInput.value = '';
+    });
+  }
+
   // Run initial search
   executeSearch("distributed consensus");
 

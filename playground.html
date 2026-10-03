@@ -76,11 +76,14 @@
       <section class="studio-panel">
         <div class="studio-panel-header">
           <div class="studio-tabs">
-            <button class="studio-tab-btn active" data-tab="tab-add">
-              <span>+ Add Document</span>
+            <button class="studio-tab-btn active" data-tab="tab-files">
+              <span>📁 Search My Personal Files</span>
+            </button>
+            <button class="studio-tab-btn" data-tab="tab-add">
+              <span>+ Add Text Note</span>
             </button>
             <button class="studio-tab-btn" data-tab="tab-docs">
-              <span>📄 Documents (<span id="tab-doc-count">10</span>)</span>
+              <span>📄 All Documents (<span id="tab-doc-count">10</span>)</span>
             </button>
             <button class="studio-tab-btn" data-tab="tab-bulk">
               <span>📦 Datasets &amp; JSON</span>
@@ -91,8 +94,60 @@
           </div>
         </div>
 
+        <!-- Tab 0: Search My Personal Files -->
+        <div id="tab-files" class="studio-tab-content active">
+          <div class="studio-label" style="margin-bottom: 8px;">INDEX YOUR LOCAL FILES &amp; SEARCH PRIVATELY IN-BROWSER</div>
+          <p style="font-size: 0.74rem; color: var(--text-dim); margin-bottom: 12px; line-height: 1.5;">
+            Select notes, codebases, Markdown files, or JSON from your computer. Files are indexed strictly in your browser's V8 memory using zero-copy TypedArrays.
+          </p>
+
+          <!-- Drag and Drop Zone -->
+          <div id="studio-dropzone" class="studio-dropzone">
+            <div class="dropzone-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                <line x1="12" y1="11" x2="12" y2="17"/>
+                <polyline points="9 14 12 11 15 14"/>
+              </svg>
+            </div>
+            <div class="dropzone-title">Drop your personal files or folder here</div>
+            <div class="dropzone-subtitle">Supports .txt, .md, .json, .csv, .js, .ts, .py, code, and text files</div>
+
+            <div class="dropzone-actions">
+              <button id="btn-browse-files" class="btn-studio-action" style="width: auto; height: 32px; padding: 0 14px; margin: 0; font-size: 0.74rem;">
+                📄 Choose Files...
+              </button>
+              <button id="btn-browse-folder" class="btn-studio-secondary" style="height: 32px; padding: 0 14px; font-size: 0.74rem;">
+                📁 Choose Entire Folder...
+              </button>
+            </div>
+
+            <input type="file" id="local-file-input" multiple style="display: none;" accept=".txt,.md,.markdown,.json,.csv,.js,.ts,.tsx,.jsx,.py,.html,.css,.scss,.yml,.yaml,.sh,.sql,.log,.xml,.env">
+            <input type="file" id="local-folder-input" webkitdirectory directory multiple style="display: none;">
+          </div>
+
+          <!-- Personal Files Status Box -->
+          <div id="personal-files-status-box" class="file-stat-row">
+            <div>
+              <span style="color: var(--text-soft);">Indexed Personal Files:</span>
+              <strong id="personal-file-count" style="color: var(--accent); margin-left: 4px;">0 files</strong>
+            </div>
+            <button id="btn-clear-personal-files" class="btn-studio-secondary" style="font-size: 0.68rem; padding: 2px 8px; color: #f43f5e;" title="Remove only personal files">
+              Clear My Files
+            </button>
+          </div>
+
+          <!-- Personal Files List -->
+          <div class="studio-label" style="margin-bottom: 6px;">INDEXED PERSONAL FILES:</div>
+          <div id="personal-files-list" class="doc-list-scroll" style="max-height: 220px;">
+            <div style="padding: 16px; text-align: center; color: var(--text-dim); font-size: 0.76rem;">
+              No personal files indexed yet. Drag &amp; drop files above or click "Choose Files..." to test search against your local files!
+            </div>
+          </div>
+        </div>
+
         <!-- Tab 1: Add Custom Document -->
-        <div id="tab-add" class="studio-tab-content active">
+        <div id="tab-add" class="studio-tab-content">
           <div class="studio-form-group">
             <label class="studio-label" for="doc-title-input">DOCUMENT TITLE</label>
             <input 
@@ -258,6 +313,14 @@
 
         <!-- Terminal Control Bar -->
         <div class="terminal-control-bar">
+          <!-- Corpus Filter Bar -->
+          <div class="corpus-filter-bar">
+            <span style="color: var(--text-faint); margin-right: 4px;">Search In:</span>
+            <button class="corpus-filter-btn active" data-filter="all">All Documents (<span id="filter-count-all">10</span>)</button>
+            <button class="corpus-filter-btn" data-filter="personal">📁 My Personal Files Only (<span id="filter-count-personal">0</span>)</button>
+            <button class="corpus-filter-btn" data-filter="sample">Sample Research Papers (<span id="filter-count-sample">10</span>)</button>
+          </div>
+
           <div class="search-input-group">
             <div class="search-field-wrap">
               <svg class="search-field-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

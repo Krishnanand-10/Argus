@@ -1,7 +1,7 @@
 /**
  * Argus Search Engine — Interactive In-Memory REPL & Document Studio
- * Dedicated client-side engine with live document indexing, custom text ingestion,
- * Porter stemmer analysis, and Okapi BM25 scoring.
+ * Dedicated client-side engine with live personal file & folder ingestion,
+ * custom text indexing, Porter stemmer analysis, and Okapi BM25 scoring.
  */
 
 // ============================================================================
@@ -32,7 +32,7 @@ const PorterStemmer = (() => {
   const s_v = "^(" + C + ")?" + v;
 
   return function stem(w) {
-    w = w.toLowerCase();
+    w = (w || "").toLowerCase();
     if (w.length < 3) return w;
 
     let firstch = w.substr(0, 1);
@@ -202,63 +202,73 @@ function tokenize(text) {
 const DEFAULT_CORPUS = [
   {
     id: 1,
-    title: "Raft: A Understandable Distributed Consensus Algorithm",
+    title: "Raft: An Understandable Distributed Consensus Algorithm",
     path: "systems/distributed/raft-consensus.md",
-    body: "Raft is a distributed consensus algorithm designed for state machine replication across server clusters. By decomposing consensus into distinct subproblems—leader election, log replication, and safety—Raft ensures strong serializability and fault tolerance with high mechanical efficiency."
+    body: "Raft is a distributed consensus algorithm designed for state machine replication across server clusters. By decomposing consensus into distinct subproblems—leader election, log replication, and safety—Raft ensures strong serializability and fault tolerance with high mechanical efficiency.",
+    isPersonal: false
   },
   {
     id: 2,
     title: "Okapi BM25: Probabilistic Relevance Scoring & Term Saturation",
     path: "ir/ranking/okapi-bm25.md",
-    body: "Okapi BM25 is a non-linear ranking function used by search engines to estimate document relevance. It introduces non-linear term frequency saturation via the k1 parameter and normalizes against corpus document length using b, superseding classical TF-IDF."
+    body: "Okapi BM25 is a non-linear ranking function used by search engines to estimate document relevance. It introduces non-linear term frequency saturation via the k1 parameter and normalizes against corpus document length using b, superseding classical TF-IDF.",
+    isPersonal: false
   },
   {
     id: 3,
     title: "Variable-Byte (Varint) and Delta-Gap Inverted Index Compression",
     path: "storage/compression/varint-delta.md",
-    body: "Inverted indexes serialize sorted posting lists using delta encoding (d-gaps), storing strictly monotonic DocID differences. These small integers are packed with Variable-Byte (VByte) encoding, achieving 70% compression ratios with zero memory decompression overhead."
+    body: "Inverted indexes serialize sorted posting lists using delta encoding (d-gaps), storing strictly monotonic DocID differences. These small integers are packed with Variable-Byte (VByte) encoding, achieving 70% compression ratios with zero memory decompression overhead.",
+    isPersonal: false
   },
   {
     id: 4,
     title: "Byzantine Fault Tolerance & Quorum Slices in Decentralized Logs",
     path: "systems/consensus/byzantine-quorum.md",
-    body: "Byzantine fault tolerance protocols guarantee liveness and safety even when participant nodes fail arbitrarily or act maliciously. Quorum slices allow decentralized consensus without requiring global synchrony or centralized coordinators."
+    body: "Byzantine fault tolerance protocols guarantee liveness and safety even when participant nodes fail arbitrarily or act maliciously. Quorum slices allow decentralized consensus without requiring global synchrony or centralized coordinators.",
+    isPersonal: false
   },
   {
     id: 5,
     title: "Mechanical Sympathy in V8: Contiguous TypedArrays & Zero-GC Engines",
     path: "runtime/v8/typedarray-memory.md",
-    body: "Mechanical sympathy requires aligning data structure layout with CPU cache lines and the V8 runtime. Argus leverages contiguous TypedArrays (Uint32Array, Float32Array) instead of fragmented heap objects, eliminating garbage collection pauses."
+    body: "Mechanical sympathy requires aligning data structure layout with CPU cache lines and the V8 runtime. Argus leverages contiguous TypedArrays (Uint32Array, Float32Array) instead of fragmented heap objects, eliminating garbage collection pauses.",
+    isPersonal: false
   },
   {
     id: 6,
     title: "Skip-List Intersection and WAND Dynamic Pruning for Fast Retrieval",
     path: "ir/index/wand-skip-lists.md",
-    body: "During multi-term boolean queries, skip lists placed at root-L intervals allow leaping across non-matching document blocks. Weak AND (WAND) dynamic pruning calculates upper-bound score contributions to skip non-competitive documents entirely."
+    body: "During multi-term boolean queries, skip lists placed at root-L intervals allow leaping across non-matching document blocks. Weak AND (WAND) dynamic pruning calculates upper-bound score contributions to skip non-competitive documents entirely.",
+    isPersonal: false
   },
   {
     id: 7,
     title: "Positional Postings and Exact Phrase Search with Slop Distances",
     path: "ir/query/positional-phrase.md",
-    body: "Positional inverted indexes record word offset sequences for every document posting. This allows verifying exact phrases and proximity queries in linear time by computing difference arrays over positional posting streams."
+    body: "Positional inverted indexes record word offset sequences for every document posting. This allows verifying exact phrases and proximity queries in linear time by computing difference arrays over positional posting streams.",
+    isPersonal: false
   },
   {
     id: 8,
     title: "Unicode Normalization & Morphological Porter Stemming Codecs",
     path: "analyzer/nlp/porter-stemmer.md",
-    body: "Text analysis pipelines normalize Unicode codepoints using NFKD decomposition before applying the algorithmic Porter stemmer. Suffix stripping collapses lexical variations like 'retrieval' and 'retrieving' to their root stem 'retriev'."
+    body: "Text analysis pipelines normalize Unicode codepoints using NFKD decomposition before applying the algorithmic Porter stemmer. Suffix stripping collapses lexical variations like 'retrieval' and 'retrieving' to their root stem 'retriev'.",
+    isPersonal: false
   },
   {
     id: 9,
     title: "LSM-Tree vs B-Tree Storage Engines for Write-Heavy Inverted Logs",
     path: "storage/engine/lsm-vs-btree.md",
-    body: "Log-Structured Merge-Trees (LSM-trees) optimize write amplification by appending incoming mutations to an in-memory memtable before flushing immutable SSTables to disk, contrasting with in-place page updating B-Trees."
+    body: "Log-Structured Merge-Trees (LSM-trees) optimize write amplification by appending incoming mutations to an in-memory memtable before flushing immutable SSTables to disk, contrasting with in-place page updating B-Trees.",
+    isPersonal: false
   },
   {
     id: 10,
     title: "Vector Search vs Lexical Full-Text Retrieval: Hybrid Search Paradigms",
     path: "ir/hybrid/vector-lexical.md",
-    body: "While dense neural embeddings capture semantic intent, lexical BM25 search remains irreplaceable for exact keyword precision, code search, and low-latency deterministic scoring. Modern engines combine both in a hybrid fusion pipeline."
+    body: "While dense neural embeddings capture semantic intent, lexical BM25 search remains irreplaceable for exact keyword precision, code search, and low-latency deterministic scoring. Modern engines combine both in a hybrid fusion pipeline.",
+    isPersonal: false
   }
 ];
 
@@ -275,20 +285,22 @@ class StudioEngine {
     this.b = 0.75;
 
     for (const doc of docs) {
-      this.addDocument(doc, false);
+      this.addDocument(doc);
     }
   }
 
-  addDocument(doc, autoIncrement = true) {
+  addDocument(doc) {
     const docId = typeof doc.id === "number" ? doc.id : this.getNextDocId();
     const storedDoc = {
       id: docId,
       title: doc.title || "Untitled Document",
       path: doc.path || `notes/doc-${docId}.md`,
-      body: doc.body || ""
+      body: doc.body || "",
+      isPersonal: !!doc.isPersonal,
+      fileSize: doc.fileSize || 0,
+      fileName: doc.fileName || doc.title || ""
     };
 
-    // Remove if already exists to allow update
     if (this.documents.has(docId)) {
       this.removeDocument(docId);
     }
@@ -324,7 +336,6 @@ class StudioEngine {
     this.docLengths.delete(docId);
     this.documents.delete(docId);
 
-    // Remove from postings
     for (const [stem, termMap] of this.postings.entries()) {
       if (termMap.has(docId)) {
         termMap.delete(docId);
@@ -348,7 +359,7 @@ class StudioEngine {
     return this.documents.size > 0 ? this.totalDocLength / this.documents.size : 1;
   }
 
-  search(queryStr) {
+  search(queryStr, filter = "all") {
     const startTime = performance.now();
     queryStr = (queryStr || "").trim();
     if (!queryStr) {
@@ -403,6 +414,13 @@ class StudioEngine {
       const idf = Math.log((N - df + 0.5) / (df + 0.5) + 1);
 
       for (const [docId, posting] of termPostings.entries()) {
+        const doc = this.documents.get(docId);
+        if (!doc) continue;
+
+        // Apply corpus filter: 'all' | 'personal' | 'sample'
+        if (filter === "personal" && !doc.isPersonal) continue;
+        if (filter === "sample" && doc.isPersonal) continue;
+
         candidatesScanned++;
         const dl = this.docLengths.get(docId) || this.avgdl;
         const tf = posting.tf;
@@ -448,12 +466,14 @@ class StudioEngine {
 
     const elapsedMs = +(performance.now() - startTime).toFixed(2);
 
-    const results = ranked.slice(0, 10).map(item => {
+    const results = ranked.slice(0, 15).map(item => {
       const doc = this.documents.get(item.docId);
       return {
         docId: doc.id,
         title: doc.title,
         path: doc.path,
+        isPersonal: !!doc.isPersonal,
+        fileSize: doc.fileSize || 0,
         score: +item.score.toFixed(2),
         snippet: this.generateSnippet(doc.body, stems),
         matchedStems: Array.from(item.matchedStems),
@@ -506,7 +526,7 @@ class StudioEngine {
 }
 
 function escapeHtml(str) {
-  return str
+  return (str || "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
@@ -517,8 +537,9 @@ function escapeHtml(str) {
 // ============================================================================
 document.addEventListener("DOMContentLoaded", () => {
   const engine = new StudioEngine(DEFAULT_CORPUS);
+  let activeCorpusFilter = "all"; // 'all' | 'personal' | 'sample'
 
-  // DOM Elements
+  // DOM Elements - Search
   const searchInput = document.getElementById("repl-search-input");
   const clearBtn = document.getElementById("clear-search-btn");
   const resultsContainer = document.getElementById("repl-results-list");
@@ -532,6 +553,21 @@ document.addEventListener("DOMContentLoaded", () => {
   const resultsCountBadge = document.getElementById("results-count-badge");
   const corpusStatusPill = document.getElementById("corpus-status-pill");
   const tabDocCount = document.getElementById("tab-doc-count");
+
+  // Filter Buttons & Counts
+  const filterCountAll = document.getElementById("filter-count-all");
+  const filterCountPersonal = document.getElementById("filter-count-personal");
+  const filterCountSample = document.getElementById("filter-count-sample");
+
+  // Personal File Ingestion Elements
+  const dropzone = document.getElementById("studio-dropzone");
+  const localFileInput = document.getElementById("local-file-input");
+  const localFolderInput = document.getElementById("local-folder-input");
+  const btnBrowseFiles = document.getElementById("btn-browse-files");
+  const btnBrowseFolder = document.getElementById("btn-browse-folder");
+  const personalFileCount = document.getElementById("personal-file-count");
+  const personalFilesList = document.getElementById("personal-files-list");
+  const btnClearPersonalFiles = document.getElementById("btn-clear-personal-files");
 
   // Ingestion Form Elements
   const docTitleInput = document.getElementById("doc-title-input");
@@ -593,13 +629,30 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // Corpus Filter Buttons
+  document.querySelectorAll(".corpus-filter-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".corpus-filter-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      activeCorpusFilter = btn.getAttribute("data-filter");
+      performSearch(searchInput.value);
+    });
+  });
+
+  function updateFilterButtons() {
+    document.querySelectorAll(".corpus-filter-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.getAttribute("data-filter") === activeCorpusFilter);
+    });
+  }
+
   // Execute Search
   function performSearch(query) {
-    const response = engine.search(query);
+    const response = engine.search(query, activeCorpusFilter);
 
-    // Latency
+    // Latency & Counts
     latencyVal.textContent = `${response.latencyMs} ms`;
-    resultsCountBadge.textContent = `${response.results.length} Matches Found`;
+    const filterLabel = activeCorpusFilter === "personal" ? " (Personal Files Only)" : activeCorpusFilter === "sample" ? " (Sample Papers Only)" : "";
+    resultsCountBadge.textContent = `${response.results.length} Matches${filterLabel}`;
 
     // AST Plan
     astPlanPre.textContent = response.astPlan;
@@ -629,7 +682,9 @@ document.addEventListener("DOMContentLoaded", () => {
           </svg>
           <div>No indexed documents match <code>"${escapeHtml(query)}"</code></div>
           <p style="margin-top: 6px; font-size: 0.72rem; color: var(--text-dim);">
-            Use the Document Studio on the left to index custom text containing these terms!
+            ${activeCorpusFilter === "personal" 
+              ? "No matches found in your personal files. Drop more files or switch filter to 'All Documents'!" 
+              : "Drop personal files or add custom text in the studio panel to index new terms!"}
           </p>
         </div>
       `;
@@ -641,12 +696,19 @@ document.addEventListener("DOMContentLoaded", () => {
         ? res.matchedStems.map(s => `<span class="matched-term-tag">${escapeHtml(s)}</span>`).join("")
         : "";
 
+      const personalBadge = res.isPersonal
+        ? `<span class="file-pill-badge" title="Indexed from your personal files">📁 Personal File</span>`
+        : "";
+
       return `
         <article class="result-card" data-doc-id="${res.docId}">
           <div class="result-header">
             <span class="result-rank-num">#${idx + 1}</span>
             <div style="flex: 1; min-width: 0;">
-              <h3 class="result-title">${escapeHtml(res.title)}</h3>
+              <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px; flex-wrap: wrap;">
+                <h3 class="result-title">${escapeHtml(res.title)}</h3>
+                ${personalBadge}
+              </div>
               <div class="result-path">${escapeHtml(res.path)}</div>
             </div>
             <span class="bm25-score-pill">BM25: ${res.score.toFixed(2)}</span>
@@ -664,7 +726,6 @@ document.addEventListener("DOMContentLoaded", () => {
       `;
     }).join("");
 
-    // Click result to view in modal
     resultsContainer.querySelectorAll(".result-card").forEach(card => {
       card.addEventListener("click", () => {
         const id = parseInt(card.getAttribute("data-doc-id"), 10);
@@ -675,15 +736,75 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Update Corpus Metrics
   function updateCorpusStats() {
-    const count = engine.documents.size;
-    let totalTerms = 0;
-    for (const map of engine.postings.values()) {
-      totalTerms += map.size;
+    const allDocs = Array.from(engine.documents.values());
+    const personalDocs = allDocs.filter(d => d.isPersonal);
+    const sampleDocs = allDocs.filter(d => !d.isPersonal);
+
+    corpusStatusPill.textContent = `${allDocs.length} DOCS INDEXED`;
+    tabDocCount.textContent = allDocs.length;
+
+    if (filterCountAll) filterCountAll.textContent = allDocs.length;
+    if (filterCountPersonal) filterCountPersonal.textContent = personalDocs.length;
+    if (filterCountSample) filterCountSample.textContent = sampleDocs.length;
+    if (personalFileCount) personalFileCount.textContent = `${personalDocs.length} file${personalDocs.length === 1 ? '' : 's'}`;
+
+    renderDocumentList();
+    renderPersonalFilesList(personalDocs);
+  }
+
+  // Render Personal Files in Tab 0
+  function renderPersonalFilesList(personalDocs) {
+    if (!personalFilesList) return;
+
+    if (personalDocs.length === 0) {
+      personalFilesList.innerHTML = `
+        <div style="padding: 16px; text-align: center; color: var(--text-dim); font-size: 0.76rem;">
+          No personal files indexed yet. Drag &amp; drop files above or click "Choose Files..." to test search against your local files!
+        </div>
+      `;
+      return;
     }
 
-    corpusStatusPill.textContent = `${count} DOCS INDEXED`;
-    tabDocCount.textContent = count;
-    renderDocumentList();
+    personalFilesList.innerHTML = personalDocs.map(d => {
+      const length = engine.docLengths.get(d.id) || 0;
+      const sizeKb = d.fileSize ? ` · ${(d.fileSize / 1024).toFixed(1)} KB` : "";
+      return `
+        <div class="doc-list-item" data-id="${d.id}">
+          <div style="flex: 1; min-width: 0;">
+            <div class="doc-item-title" title="Click to view file text">${escapeHtml(d.title)}</div>
+            <div class="doc-item-sub">
+              <span class="file-pill-badge" style="font-size: 0.6rem; padding: 0 4px;">#${d.id}</span>
+              <span>${escapeHtml(d.path)}${sizeKb}</span>
+              <span>${length} terms</span>
+            </div>
+          </div>
+          <button class="doc-delete-btn" title="Remove this file" data-delete-id="${d.id}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+          </button>
+        </div>
+      `;
+    }).join("");
+
+    personalFilesList.querySelectorAll(".doc-item-title").forEach(title => {
+      title.addEventListener("click", () => {
+        const id = parseInt(title.closest(".doc-list-item").getAttribute("data-id"), 10);
+        openDocumentModal(id);
+      });
+    });
+
+    personalFilesList.querySelectorAll(".doc-delete-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const id = parseInt(btn.getAttribute("data-delete-id"), 10);
+        engine.removeDocument(id);
+        updateCorpusStats();
+        performSearch(searchInput.value);
+        showToast(`Removed personal file #${id}`);
+      });
+    });
   }
 
   // Render Document List in Tab 2
@@ -705,11 +826,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     studioDocList.innerHTML = docs.map(d => {
       const length = engine.docLengths.get(d.id) || 0;
+      const personalBadge = d.isPersonal ? '<span class="file-pill-badge" style="font-size: 0.6rem; padding: 0 4px;">Personal</span>' : '';
       return `
         <div class="doc-list-item" data-id="${d.id}">
           <div style="flex: 1; min-width: 0;">
             <div class="doc-item-title" title="Click to view text">${escapeHtml(d.title)}</div>
             <div class="doc-item-sub">
+              ${personalBadge}
               <span style="color: var(--accent);">#${d.id}</span>
               <span>${escapeHtml(d.path)}</span>
               <span>${length} terms</span>
@@ -725,7 +848,6 @@ document.addEventListener("DOMContentLoaded", () => {
       `;
     }).join("");
 
-    // Bind item click
     studioDocList.querySelectorAll(".doc-item-title").forEach(title => {
       title.addEventListener("click", () => {
         const id = parseInt(title.closest(".doc-list-item").getAttribute("data-id"), 10);
@@ -733,7 +855,6 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
 
-    // Bind delete click
     studioDocList.querySelectorAll(".doc-delete-btn").forEach(btn => {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -746,15 +867,141 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Process Local Personal Files
+  async function processLocalFiles(fileList) {
+    if (!fileList || fileList.length === 0) return;
+
+    let addedCount = 0;
+    let firstTerm = "";
+
+    for (const file of fileList) {
+      if (file.size > 5000000) continue; // Skip large files > 5MB
+
+      try {
+        const content = await file.text();
+        if (content.includes("\0")) continue; // Skip binary files
+
+        const doc = engine.addDocument({
+          title: file.name,
+          path: file.webkitRelativePath || `personal/${file.name}`,
+          body: content,
+          isPersonal: true,
+          fileSize: file.size,
+          fileName: file.name
+        });
+
+        addedCount++;
+        if (!firstTerm) {
+          const t = tokenize(doc.title);
+          if (t.length > 0) firstTerm = t[0].raw;
+        }
+
+        // Try syncing with server
+        fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ files: [{ name: file.name, content }] })
+        }).catch(() => {});
+
+      } catch (err) {
+        console.warn("Failed reading", file.name, err);
+      }
+    }
+
+    if (addedCount > 0) {
+      activeCorpusFilter = "personal";
+      updateFilterButtons();
+      updateCorpusStats();
+      showToast(`Indexed ${addedCount} personal file${addedCount > 1 ? "s" : ""} into V8 memory!`);
+
+      if (firstTerm) {
+        searchInput.value = firstTerm;
+        clearBtn.style.display = "block";
+      }
+      performSearch(searchInput.value);
+    } else {
+      alert("No readable text, markdown, code, or JSON files found in selected files.");
+    }
+  }
+
+  // Personal File Input & Dropzone Bindings
+  if (btnBrowseFiles && localFileInput) {
+    btnBrowseFiles.addEventListener("click", (e) => {
+      e.stopPropagation();
+      localFileInput.click();
+    });
+
+    localFileInput.addEventListener("change", (e) => {
+      processLocalFiles(e.target.files);
+      localFileInput.value = "";
+    });
+  }
+
+  if (btnBrowseFolder && localFolderInput) {
+    btnBrowseFolder.addEventListener("click", (e) => {
+      e.stopPropagation();
+      localFolderInput.click();
+    });
+
+    localFolderInput.addEventListener("change", (e) => {
+      processLocalFiles(e.target.files);
+      localFolderInput.value = "";
+    });
+  }
+
+  if (dropzone) {
+    dropzone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropzone.classList.add("dragover");
+    });
+
+    dropzone.addEventListener("dragleave", () => {
+      dropzone.classList.remove("dragover");
+    });
+
+    dropzone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropzone.classList.remove("dragover");
+      if (e.dataTransfer && e.dataTransfer.files) {
+        processLocalFiles(e.dataTransfer.files);
+      }
+    });
+
+    dropzone.addEventListener("click", () => {
+      if (localFileInput) localFileInput.click();
+    });
+  }
+
+  if (btnClearPersonalFiles) {
+    btnClearPersonalFiles.addEventListener("click", () => {
+      const personalIds = [];
+      for (const [id, doc] of engine.documents.entries()) {
+        if (doc.isPersonal) personalIds.push(id);
+      }
+      if (personalIds.length === 0) {
+        showToast("No personal files to clear");
+        return;
+      }
+      for (const id of personalIds) {
+        engine.removeDocument(id);
+      }
+      activeCorpusFilter = "all";
+      updateFilterButtons();
+      updateCorpusStats();
+      performSearch(searchInput.value);
+      showToast("Cleared all personal files from index");
+    });
+  }
+
   // Open Document Modal
   function openDocumentModal(docId) {
     const doc = engine.documents.get(docId);
     if (!doc) return;
 
     modalDocTitle.textContent = doc.title;
-    modalDocSub.textContent = `Document ID: #${doc.id} · ${doc.path} · ${engine.docLengths.get(doc.id) || 0} indexed terms`;
-    
-    // Highlight query words in modal body
+    const personalTag = doc.isPersonal ? " · Personal File" : "";
+    modalDocSub.textContent = `Document ID: #${doc.id} · ${doc.path} · ${engine.docLengths.get(doc.id) || 0} indexed terms${personalTag}`;
+
     const q = searchInput.value.trim();
     const tokens = tokenize(q.replace(/"/g, ""));
     const stems = tokens.map(t => t.stem);
@@ -818,22 +1065,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const doc = engine.addDocument({
       title: title || "Untitled Document",
       path: path || "custom/user-note.md",
-      body: body || title
+      body: body || title,
+      isPersonal: true
     });
 
-    // Also attempt backend POST /api/index asynchronously if connected
     fetch("/api/index", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(doc)
-    }).catch(() => {
-      // Offline fallback: already indexed client-side
-    });
+    }).catch(() => {});
 
     updateCorpusStats();
     showToast(`Indexed "${doc.title}" into memory (+${engine.docLengths.get(doc.id)} terms)`);
 
-    // Reset inputs
     docTitleInput.value = "";
     docPathInput.value = "";
     docBodyInput.value = "";
@@ -842,7 +1086,6 @@ document.addEventListener("DOMContentLoaded", () => {
     liveTokenCount.textContent = "0";
     liveStemChips.innerHTML = '<span class="token-chip" style="opacity: 0.5;">Type text above to preview token stream...</span>';
 
-    // Auto-search for a term from the new doc
     const newTokens = tokenize(doc.title);
     if (newTokens.length > 0) {
       searchInput.value = newTokens[0].raw;
@@ -890,6 +1133,8 @@ document.addEventListener("DOMContentLoaded", () => {
       for (const d of DEFAULT_CORPUS) {
         engine.addDocument(d);
       }
+      activeCorpusFilter = "all";
+      updateFilterButtons();
       updateCorpusStats();
       performSearch(searchInput.value);
       showToast("Corpus reset to default 10 documents");
@@ -912,10 +1157,15 @@ document.addEventListener("DOMContentLoaded", () => {
       let count = 0;
       for (const item of parsed) {
         if (item.title || item.body) {
-          engine.addDocument(item);
+          engine.addDocument({
+            ...item,
+            isPersonal: true
+          });
           count++;
         }
       }
+      activeCorpusFilter = "personal";
+      updateFilterButtons();
       updateCorpusStats();
       performSearch(searchInput.value);
       showToast(`Successfully indexed ${count} JSON documents`);
