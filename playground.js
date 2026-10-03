@@ -1286,35 +1286,11 @@ document.addEventListener("DOMContentLoaded", () => {
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
             </svg>
             <div style="font-size: 1.05rem; font-weight: 700; color: #ffffff; margin-bottom: 6px; font-family: var(--font-sans);">Zero Documents Indexed Yet</div>
-            <p style="margin: 0 auto 18px; max-width: 440px; font-size: 0.82rem; color: #a1a1aa; line-height: 1.5; font-family: var(--font-sans);">
+            <p style="margin: 0 auto; max-width: 440px; font-size: 0.82rem; color: #a1a1aa; line-height: 1.5; font-family: var(--font-sans);">
               Drop your personal files or folder in the left panel, or click "+ Write New Text Note" to start searching privately in browser memory.
             </p>
-            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-              <button id="btn-empty-choose-files" class="btn-studio-action" style="height: 36px; padding: 0 16px; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 6px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
-                </svg>
-                <span>Choose Files...</span>
-              </button>
-              <button id="btn-empty-add-note" class="btn-studio-secondary" style="height: 36px; padding: 0 16px; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 6px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2">
-                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                </svg>
-                <span>+ Write Text Note</span>
-              </button>
-            </div>
           </div>
         `;
-        const btnEmptyFiles = document.getElementById("btn-empty-choose-files");
-        if (btnEmptyFiles && localFileInput) {
-          btnEmptyFiles.addEventListener("click", () => localFileInput.click());
-        }
-        const btnEmptyNote = document.getElementById("btn-empty-add-note");
-        if (btnEmptyNote) {
-          btnEmptyNote.addEventListener("click", openNoteModal);
-        }
         return;
       }
 
