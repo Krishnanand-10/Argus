@@ -197,86 +197,10 @@ function tokenize(text) {
 }
 
 // ============================================================================
-// 4. Default Benchmark Datasets
-// ============================================================================
-const DEFAULT_CORPUS = [
-  {
-    id: 1,
-    title: "Raft: An Understandable Distributed Consensus Algorithm",
-    path: "systems/distributed/raft-consensus.md",
-    body: "Raft is a distributed consensus algorithm designed for state machine replication across server clusters. By decomposing consensus into distinct subproblems—leader election, log replication, and safety—Raft ensures strong serializability and fault tolerance with high mechanical efficiency.",
-    isPersonal: false
-  },
-  {
-    id: 2,
-    title: "Okapi BM25: Probabilistic Relevance Scoring & Term Saturation",
-    path: "ir/ranking/okapi-bm25.md",
-    body: "Okapi BM25 is a non-linear ranking function used by search engines to estimate document relevance. It introduces non-linear term frequency saturation via the k1 parameter and normalizes against corpus document length using b, superseding classical TF-IDF.",
-    isPersonal: false
-  },
-  {
-    id: 3,
-    title: "Variable-Byte (Varint) and Delta-Gap Inverted Index Compression",
-    path: "storage/compression/varint-delta.md",
-    body: "Inverted indexes serialize sorted posting lists using delta encoding (d-gaps), storing strictly monotonic DocID differences. These small integers are packed with Variable-Byte (VByte) encoding, achieving 70% compression ratios with zero memory decompression overhead.",
-    isPersonal: false
-  },
-  {
-    id: 4,
-    title: "Byzantine Fault Tolerance & Quorum Slices in Decentralized Logs",
-    path: "systems/consensus/byzantine-quorum.md",
-    body: "Byzantine fault tolerance protocols guarantee liveness and safety even when participant nodes fail arbitrarily or act maliciously. Quorum slices allow decentralized consensus without requiring global synchrony or centralized coordinators.",
-    isPersonal: false
-  },
-  {
-    id: 5,
-    title: "Mechanical Sympathy in V8: Contiguous TypedArrays & Zero-GC Engines",
-    path: "runtime/v8/typedarray-memory.md",
-    body: "Mechanical sympathy requires aligning data structure layout with CPU cache lines and the V8 runtime. Argus leverages contiguous TypedArrays (Uint32Array, Float32Array) instead of fragmented heap objects, eliminating garbage collection pauses.",
-    isPersonal: false
-  },
-  {
-    id: 6,
-    title: "Skip-List Intersection and WAND Dynamic Pruning for Fast Retrieval",
-    path: "ir/index/wand-skip-lists.md",
-    body: "During multi-term boolean queries, skip lists placed at root-L intervals allow leaping across non-matching document blocks. Weak AND (WAND) dynamic pruning calculates upper-bound score contributions to skip non-competitive documents entirely.",
-    isPersonal: false
-  },
-  {
-    id: 7,
-    title: "Positional Postings and Exact Phrase Search with Slop Distances",
-    path: "ir/query/positional-phrase.md",
-    body: "Positional inverted indexes record word offset sequences for every document posting. This allows verifying exact phrases and proximity queries in linear time by computing difference arrays over positional posting streams.",
-    isPersonal: false
-  },
-  {
-    id: 8,
-    title: "Unicode Normalization & Morphological Porter Stemming Codecs",
-    path: "analyzer/nlp/porter-stemmer.md",
-    body: "Text analysis pipelines normalize Unicode codepoints using NFKD decomposition before applying the algorithmic Porter stemmer. Suffix stripping collapses lexical variations like 'retrieval' and 'retrieving' to their root stem 'retriev'.",
-    isPersonal: false
-  },
-  {
-    id: 9,
-    title: "LSM-Tree vs B-Tree Storage Engines for Write-Heavy Inverted Logs",
-    path: "storage/engine/lsm-vs-btree.md",
-    body: "Log-Structured Merge-Trees (LSM-trees) optimize write amplification by appending incoming mutations to an in-memory memtable before flushing immutable SSTables to disk, contrasting with in-place page updating B-Trees.",
-    isPersonal: false
-  },
-  {
-    id: 10,
-    title: "Vector Search vs Lexical Full-Text Retrieval: Hybrid Search Paradigms",
-    path: "ir/hybrid/vector-lexical.md",
-    body: "While dense neural embeddings capture semantic intent, lexical BM25 search remains irreplaceable for exact keyword precision, code search, and low-latency deterministic scoring. Modern engines combine both in a hybrid fusion pipeline.",
-    isPersonal: false
-  }
-];
-
-// ============================================================================
-// 5. In-Memory Search Engine
+// 4. In-Memory Search Engine
 // ============================================================================
 class StudioEngine {
-  constructor(docs = DEFAULT_CORPUS) {
+  constructor(docs = []) {
     this.documents = new Map();
     this.docLengths = new Map();
     this.totalDocLength = 0;
@@ -291,12 +215,16 @@ class StudioEngine {
 
   addDocument(doc) {
     const docId = typeof doc.id === "number" ? doc.id : this.getNextDocId();
+    const isFile = !!doc.isFile;
+    const isNote = doc.isNote !== undefined ? !!doc.isNote : !isFile;
     const storedDoc = {
       id: docId,
       title: doc.title || "Untitled Document",
-      path: doc.path || `notes/doc-${docId}.md`,
+      path: doc.path || (isFile ? `files/${doc.fileName || 'file-' + docId}` : `notes/doc-${docId}.md`),
       body: doc.body || "",
-      isPersonal: !!doc.isPersonal,
+      isPersonal: true,
+      isFile: isFile,
+      isNote: isNote,
       fileSize: doc.fileSize || 0,
       fileName: doc.fileName || doc.title || ""
     };
@@ -417,9 +345,10 @@ class StudioEngine {
         const doc = this.documents.get(docId);
         if (!doc) continue;
 
-        // Apply corpus filter: 'all' | 'personal' | 'sample'
-        if (filter === "personal" && !doc.isPersonal) continue;
-        if (filter === "sample" && doc.isPersonal) continue;
+        // Apply corpus filter: 'all' | 'files' | 'notes' | 'personal'
+        if (filter === "files" && !doc.isFile) continue;
+        if (filter === "notes" && !doc.isNote) continue;
+        if (filter === "personal" && !doc.isFile) continue;
 
         candidatesScanned++;
         const dl = this.docLengths.get(docId) || this.avgdl;
@@ -472,7 +401,9 @@ class StudioEngine {
         docId: doc.id,
         title: doc.title,
         path: doc.path,
-        isPersonal: !!doc.isPersonal,
+        isPersonal: true,
+        isFile: !!doc.isFile,
+        isNote: !!doc.isNote,
         fileSize: doc.fileSize || 0,
         score: +item.score.toFixed(2),
         snippet: this.generateSnippet(doc.body, stems),
@@ -536,8 +467,8 @@ function escapeHtml(str) {
 // 6. Studio UI Controller
 // ============================================================================
 document.addEventListener("DOMContentLoaded", () => {
-  const engine = new StudioEngine(DEFAULT_CORPUS);
-  let activeCorpusFilter = "all"; // 'all' | 'personal' | 'sample'
+  const engine = new StudioEngine([]);
+  let activeCorpusFilter = "all"; // 'all' | 'files' | 'notes'
 
   // DOM Elements - Search
   const searchInput = document.getElementById("repl-search-input");
@@ -556,8 +487,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Filter Buttons & Counts
   const filterCountAll = document.getElementById("filter-count-all");
+  const filterCountFiles = document.getElementById("filter-count-files");
+  const filterCountNotes = document.getElementById("filter-count-notes");
   const filterCountPersonal = document.getElementById("filter-count-personal");
-  const filterCountSample = document.getElementById("filter-count-sample");
 
   // Personal File Ingestion Elements
   const dropzone = document.getElementById("studio-dropzone");
@@ -587,8 +519,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // Bulk Elements
   const bulkJsonInput = document.getElementById("bulk-json-input");
   const btnIngestJson = document.getElementById("btn-ingest-json");
-  const btnLoadDistrib = document.getElementById("btn-load-distrib");
-  const btnLoadIR = document.getElementById("btn-load-ir");
 
   // BM25 Tuning Elements
   const k1Slider = document.getElementById("k1-slider");
@@ -651,7 +581,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Latency & Counts
     latencyVal.textContent = `${response.latencyMs} ms`;
-    const filterLabel = activeCorpusFilter === "personal" ? " (Personal Files Only)" : activeCorpusFilter === "sample" ? " (Sample Papers Only)" : "";
+    const filterLabel = activeCorpusFilter === "files" ? " (Files Only)" : activeCorpusFilter === "notes" ? " (Notes Only)" : "";
     resultsCountBadge.textContent = `${response.results.length} Matches${filterLabel}`;
 
     // AST Plan
@@ -674,6 +604,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Render Results
     if (response.results.length === 0) {
+      if (engine.documents.size === 0) {
+        resultsContainer.innerHTML = `
+          <div class="no-results" style="padding: 36px 20px;">
+            <div style="font-size: 2rem; margin-bottom: 12px;">📁</div>
+            <div style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin-bottom: 6px;">Zero Documents Indexed Yet</div>
+            <p style="margin: 0 auto; max-width: 420px; font-size: 0.78rem; color: var(--text-dim); line-height: 1.5;">
+              Drop your personal files or folder in the left panel, add a custom text note, or import JSON to search locally in memory.
+            </p>
+          </div>
+        `;
+        return;
+      }
+
+      if (!query.trim()) {
+        resultsContainer.innerHTML = `
+          <div class="no-results" style="padding: 36px 20px;">
+            <div style="font-size: 1.8rem; margin-bottom: 12px; opacity: 0.7;">⚡</div>
+            <div style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin-bottom: 6px;">Ready for Query Evaluation</div>
+            <p style="margin: 0 auto; max-width: 420px; font-size: 0.78rem; color: var(--text-dim); line-height: 1.5;">
+              Type keywords in the search bar above. You can combine terms with <code>AND</code>, <code>OR</code>, <code>NOT</code>, or search exact phrases with <code>"quotes"</code>.
+            </p>
+          </div>
+        `;
+        return;
+      }
+
       resultsContainer.innerHTML = `
         <div class="no-results">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto 10px; opacity: 0.4;">
@@ -682,8 +638,10 @@ document.addEventListener("DOMContentLoaded", () => {
           </svg>
           <div>No indexed documents match <code>"${escapeHtml(query)}"</code></div>
           <p style="margin-top: 6px; font-size: 0.72rem; color: var(--text-dim);">
-            ${activeCorpusFilter === "personal" 
-              ? "No matches found in your personal files. Drop more files or switch filter to 'All Documents'!" 
+            ${activeCorpusFilter === "files" 
+              ? "No matches found in uploaded files. Drop more files or switch filter to 'All Documents'!" 
+              : activeCorpusFilter === "notes"
+              ? "No matches found in text notes. Switch filter to 'All Documents' or add more text!"
               : "Drop personal files or add custom text in the studio panel to index new terms!"}
           </p>
         </div>
@@ -696,9 +654,9 @@ document.addEventListener("DOMContentLoaded", () => {
         ? res.matchedStems.map(s => `<span class="matched-term-tag">${escapeHtml(s)}</span>`).join("")
         : "";
 
-      const personalBadge = res.isPersonal
-        ? `<span class="file-pill-badge" title="Indexed from your personal files">📁 Personal File</span>`
-        : "";
+      const typeBadge = res.isFile
+        ? `<span class="file-pill-badge" title="Indexed from uploaded file">📁 File</span>`
+        : `<span class="file-pill-badge" style="border-color: rgba(168, 85, 247, 0.4); color: #c084fc; background: rgba(168, 85, 247, 0.08);" title="Custom text note">📝 Note</span>`;
 
       return `
         <article class="result-card" data-doc-id="${res.docId}">
@@ -707,7 +665,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <div style="flex: 1; min-width: 0;">
               <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px; flex-wrap: wrap;">
                 <h3 class="result-title">${escapeHtml(res.title)}</h3>
-                ${personalBadge}
+                ${typeBadge}
               </div>
               <div class="result-path">${escapeHtml(res.path)}</div>
             </div>
@@ -737,19 +695,20 @@ document.addEventListener("DOMContentLoaded", () => {
   // Update Corpus Metrics
   function updateCorpusStats() {
     const allDocs = Array.from(engine.documents.values());
-    const personalDocs = allDocs.filter(d => d.isPersonal);
-    const sampleDocs = allDocs.filter(d => !d.isPersonal);
+    const fileDocs = allDocs.filter(d => d.isFile);
+    const noteDocs = allDocs.filter(d => d.isNote);
 
-    corpusStatusPill.textContent = `${allDocs.length} DOCS INDEXED`;
-    tabDocCount.textContent = allDocs.length;
+    if (corpusStatusPill) corpusStatusPill.textContent = `${allDocs.length} DOCS INDEXED`;
+    if (tabDocCount) tabDocCount.textContent = allDocs.length;
 
     if (filterCountAll) filterCountAll.textContent = allDocs.length;
-    if (filterCountPersonal) filterCountPersonal.textContent = personalDocs.length;
-    if (filterCountSample) filterCountSample.textContent = sampleDocs.length;
-    if (personalFileCount) personalFileCount.textContent = `${personalDocs.length} file${personalDocs.length === 1 ? '' : 's'}`;
+    if (filterCountFiles) filterCountFiles.textContent = fileDocs.length;
+    if (filterCountNotes) filterCountNotes.textContent = noteDocs.length;
+    if (filterCountPersonal) filterCountPersonal.textContent = fileDocs.length;
+    if (personalFileCount) personalFileCount.textContent = `${fileDocs.length} file${fileDocs.length === 1 ? '' : 's'}`;
 
     renderDocumentList();
-    renderPersonalFilesList(personalDocs);
+    renderPersonalFilesList(fileDocs);
   }
 
   // Render Personal Files in Tab 0
@@ -883,9 +842,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const doc = engine.addDocument({
           title: file.name,
-          path: file.webkitRelativePath || `personal/${file.name}`,
+          path: file.webkitRelativePath || `files/${file.name}`,
           body: content,
-          isPersonal: true,
+          isFile: true,
+          isNote: false,
           fileSize: file.size,
           fileName: file.name
         });
@@ -909,10 +869,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (addedCount > 0) {
-      activeCorpusFilter = "personal";
+      activeCorpusFilter = "files";
       updateFilterButtons();
       updateCorpusStats();
-      showToast(`Indexed ${addedCount} personal file${addedCount > 1 ? "s" : ""} into V8 memory!`);
+      showToast(`Indexed ${addedCount} file${addedCount > 1 ? "s" : ""} into V8 memory!`);
 
       if (firstTerm) {
         searchInput.value = firstTerm;
@@ -974,22 +934,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (btnClearPersonalFiles) {
     btnClearPersonalFiles.addEventListener("click", () => {
-      const personalIds = [];
+      const fileIds = [];
       for (const [id, doc] of engine.documents.entries()) {
-        if (doc.isPersonal) personalIds.push(id);
+        if (doc.isFile) fileIds.push(id);
       }
-      if (personalIds.length === 0) {
-        showToast("No personal files to clear");
+      if (fileIds.length === 0) {
+        showToast("No uploaded files to clear");
         return;
       }
-      for (const id of personalIds) {
+      for (const id of fileIds) {
         engine.removeDocument(id);
       }
       activeCorpusFilter = "all";
       updateFilterButtons();
       updateCorpusStats();
       performSearch(searchInput.value);
-      showToast("Cleared all personal files from index");
+      showToast(`Cleared ${fileIds.length} uploaded file${fileIds.length === 1 ? '' : 's'} from index`);
     });
   }
 
@@ -999,8 +959,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!doc) return;
 
     modalDocTitle.textContent = doc.title;
-    const personalTag = doc.isPersonal ? " · Personal File" : "";
-    modalDocSub.textContent = `Document ID: #${doc.id} · ${doc.path} · ${engine.docLengths.get(doc.id) || 0} indexed terms${personalTag}`;
+    const typeTag = doc.isFile ? " · Uploaded File" : " · Text Note";
+    modalDocSub.textContent = `Document ID: #${doc.id} · ${doc.path} · ${engine.docLengths.get(doc.id) || 0} indexed terms${typeTag}`;
 
     const q = searchInput.value.trim();
     const tokens = tokenize(q.replace(/"/g, ""));
@@ -1064,9 +1024,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const doc = engine.addDocument({
       title: title || "Untitled Document",
-      path: path || "custom/user-note.md",
+      path: path || "notes/custom-note.md",
       body: body || title,
-      isPersonal: true
+      isFile: false,
+      isNote: true
     });
 
     fetch("/api/index", {
@@ -1096,48 +1057,58 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Quick Inserters
-  document.getElementById("btn-insert-raft").addEventListener("click", () => {
-    docTitleInput.value = "Raft Consensus Log Replication Subprotocol";
-    docPathInput.value = "systems/consensus/raft-log.md";
-    docBodyInput.value = "The leader appends log entries from clients and distributes them via AppendEntries RPCs. When an entry has been safely replicated across a quorum of followers, the entry is committed and applied to the state machine.";
-    docBodyInput.dispatchEvent(new Event("input"));
-  });
+  // Quick Template Inserters
+  const btnInsertNote = document.getElementById("btn-insert-note");
+  if (btnInsertNote) {
+    btnInsertNote.addEventListener("click", () => {
+      docTitleInput.value = "Weekly Team Architecture Sync";
+      docPathInput.value = "notes/meetings/architecture-sync.md";
+      docBodyInput.value = "Discussed migrating indexing workers to zero-copy memory buffers. Evaluated latency improvements across BM25 scoring pipelines and positional phrase queries.";
+      docBodyInput.dispatchEvent(new Event("input"));
+    });
+  }
 
-  document.getElementById("btn-insert-quantum").addEventListener("click", () => {
-    docTitleInput.value = "Post-Quantum Lattice-Based Cryptography";
-    docPathInput.value = "security/crypto/lattice-pqc.md";
-    docBodyInput.value = "Lattice-based cryptography relies on the hardness of high-dimensional geometric lattice problems like Learning With Errors (LWE), providing resistance against Shor's algorithm on quantum computers.";
-    docBodyInput.dispatchEvent(new Event("input"));
-  });
+  const btnInsertSpec = document.getElementById("btn-insert-spec");
+  if (btnInsertSpec) {
+    btnInsertSpec.addEventListener("click", () => {
+      docTitleInput.value = "High-Throughput Inverted Index Specification";
+      docPathInput.value = "specs/engine/inverted-index-v2.md";
+      docBodyInput.value = "Specification for mechanical sympathy and cache-aligned postings lists. Implements SIMD-friendly delta compression, skip pointers, and dynamic WAND score thresholds.";
+      docBodyInput.dispatchEvent(new Event("input"));
+    });
+  }
 
-  document.getElementById("btn-insert-vector").addEventListener("click", () => {
-    docTitleInput.value = "Hierarchical Navigable Small World (HNSW) Graphs";
-    docPathInput.value = "ir/vector/hnsw-graphs.md";
-    docBodyInput.value = "HNSW builds multi-layer proximity graphs for approximate nearest neighbor (ANN) vector search, offering logarithmic search complexity and high recall for high-dimensional embeddings.";
-    docBodyInput.dispatchEvent(new Event("input"));
-  });
+  const btnInsertReadme = document.getElementById("btn-insert-readme");
+  if (btnInsertReadme) {
+    btnInsertReadme.addEventListener("click", () => {
+      docTitleInput.value = "Project README & Development Guide";
+      docPathInput.value = "docs/readme.md";
+      docBodyInput.value = "Zero-dependency in-memory search engine in pure TypeScript. Fast lexical full-text retrieval, boolean AST evaluator, and BM25 relevance ranking.";
+      docBodyInput.dispatchEvent(new Event("input"));
+    });
+  }
 
   // Document Filter
   docFilterInput.addEventListener("input", () => {
     renderDocumentList(docFilterInput.value);
   });
 
-  // Reset Corpus
+  // Reset / Clear Corpus
   btnResetCorpus.addEventListener("click", () => {
-    if (confirm("Reset corpus back to the initial 10 research papers?")) {
+    if (engine.documents.size === 0) {
+      showToast("Index is already empty");
+      return;
+    }
+    if (confirm("Clear all indexed documents and notes from memory?")) {
       engine.documents.clear();
       engine.docLengths.clear();
       engine.postings.clear();
       engine.totalDocLength = 0;
-      for (const d of DEFAULT_CORPUS) {
-        engine.addDocument(d);
-      }
       activeCorpusFilter = "all";
       updateFilterButtons();
       updateCorpusStats();
       performSearch(searchInput.value);
-      showToast("Corpus reset to default 10 documents");
+      showToast("Cleared all documents from in-memory index");
     }
   });
 
@@ -1159,12 +1130,13 @@ document.addEventListener("DOMContentLoaded", () => {
         if (item.title || item.body) {
           engine.addDocument({
             ...item,
-            isPersonal: true
+            isFile: false,
+            isNote: true
           });
           count++;
         }
       }
-      activeCorpusFilter = "personal";
+      activeCorpusFilter = "notes";
       updateFilterButtons();
       updateCorpusStats();
       performSearch(searchInput.value);
@@ -1173,26 +1145,6 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       alert("JSON Syntax Error: " + err.message);
     }
-  });
-
-  // Load Presets
-  btnLoadDistrib.addEventListener("click", () => {
-    DEFAULT_CORPUS.forEach(d => engine.addDocument(d));
-    updateCorpusStats();
-    searchInput.value = "distributed consensus";
-    clearBtn.style.display = "block";
-    performSearch(searchInput.value);
-    showToast("Loaded Distributed Systems dataset (10 docs)");
-  });
-
-  btnLoadIR.addEventListener("click", () => {
-    const irDocs = DEFAULT_CORPUS.filter(d => d.path.startsWith("ir/"));
-    irDocs.forEach(d => engine.addDocument(d));
-    updateCorpusStats();
-    searchInput.value = "bm25 AND inverted";
-    clearBtn.style.display = "block";
-    performSearch(searchInput.value);
-    showToast("Loaded Information Retrieval dataset");
   });
 
   // BM25 Sliders

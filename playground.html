@@ -83,10 +83,10 @@
               <span>+ Add Text Note</span>
             </button>
             <button class="studio-tab-btn" data-tab="tab-docs">
-              <span>📄 All Documents (<span id="tab-doc-count">10</span>)</span>
+              <span>📄 All Documents (<span id="tab-doc-count">0</span>)</span>
             </button>
             <button class="studio-tab-btn" data-tab="tab-bulk">
-              <span>📦 Datasets &amp; JSON</span>
+              <span>📦 Bulk JSON Import</span>
             </button>
             <button class="studio-tab-btn" data-tab="tab-tuning">
               <span>⚙️ BM25 Tuning</span>
@@ -193,11 +193,11 @@
 
           <!-- Quick Text Snippet Inserters -->
           <div style="margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px;">
-            <div class="studio-label" style="margin-bottom: 8px;">QUICK SAMPLE INSERTERS:</div>
+            <div class="studio-label" style="margin-bottom: 8px;">QUICK TEMPLATE INSERTERS:</div>
             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <button id="btn-insert-raft" class="btn-studio-secondary" style="font-size: 0.7rem;">+ Raft Consensus</button>
-              <button id="btn-insert-quantum" class="btn-studio-secondary" style="font-size: 0.7rem;">+ Quantum Cryptography</button>
-              <button id="btn-insert-vector" class="btn-studio-secondary" style="font-size: 0.7rem;">+ Vector Embeddings</button>
+              <button id="btn-insert-note" class="btn-studio-secondary" style="font-size: 0.7rem;">+ Meeting Note</button>
+              <button id="btn-insert-spec" class="btn-studio-secondary" style="font-size: 0.7rem;">+ Technical Spec</button>
+              <button id="btn-insert-readme" class="btn-studio-secondary" style="font-size: 0.7rem;">+ Project README</button>
             </div>
           </div>
 
@@ -214,7 +214,7 @@
         <div id="tab-docs" class="studio-tab-content">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
             <span class="studio-label" style="margin: 0;">CORPUS DOCUMENTS</span>
-            <button id="btn-reset-corpus" class="btn-studio-secondary" style="font-size: 0.7rem; color: #f43f5e;">Reset to Default</button>
+            <button id="btn-reset-corpus" class="btn-studio-secondary" style="font-size: 0.7rem; color: #f43f5e;">Clear All Documents</button>
           </div>
           
           <input 
@@ -230,26 +230,18 @@
           </div>
         </div>
 
-        <!-- Tab 3: Bulk / Sample Datasets & JSON -->
+        <!-- Tab 3: Bulk JSON Importer -->
         <div id="tab-bulk" class="studio-tab-content">
-          <div class="studio-label" style="margin-bottom: 8px;">PRE-LOADED RESEARCH DATASETS:</div>
-          <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px;">
-            <button id="btn-load-distrib" class="btn-studio-secondary" style="text-align: left; padding: 10px 12px;">
-              <div style="font-weight: 600; color: #ffffff;">⚡ Distributed Systems &amp; Consensus (10 docs)</div>
-              <div style="font-size: 0.7rem; color: var(--text-dim);">Paxos, Raft, Byzantine Quorums, Vector Clocks, Dynamo</div>
-            </button>
-            <button id="btn-load-ir" class="btn-studio-secondary" style="text-align: left; padding: 10px 12px;">
-              <div style="font-weight: 600; color: #ffffff;">🔍 Information Retrieval &amp; Ranking (8 docs)</div>
-              <div style="font-size: 0.7rem; color: var(--text-dim);">Inverted Index, BM25, Skip Lists, WAND Pruning, Porter Stemmer</div>
-            </button>
-          </div>
+          <div class="studio-label" style="margin-bottom: 8px;">IMPORT DOCUMENTS FROM JSON:</div>
+          <p style="font-size: 0.74rem; color: var(--text-dim); margin-bottom: 12px; line-height: 1.5;">
+            Paste a JSON array of documents to index them in bulk into browser memory.
+          </p>
 
-          <div class="studio-label" for="bulk-json-input">OR PASTE RAW JSON ARRAY:</div>
           <textarea 
             id="bulk-json-input" 
             class="studio-textarea" 
-            style="min-height: 120px; font-size: 0.76rem;" 
-            placeholder='[&#10;  { "title": "Custom Document 1", "body": "Text contents..." },&#10;  { "title": "Custom Document 2", "body": "More text..." }&#10;]'
+            style="min-height: 140px; font-size: 0.76rem;" 
+            placeholder='[&#10;  { "title": "Architecture Overview", "body": "Microservices communicate via gRPC with proto3 schemas..." },&#10;  { "title": "Deployment Runbook", "body": "Rollouts require healthy canary checks in region us-east-1..." }&#10;]'
           ></textarea>
 
           <button id="btn-ingest-json" class="btn-studio-action">
@@ -307,7 +299,7 @@
           </div>
           <div class="terminal-status-tag">
             <span class="status-dot" style="width: 5px; height: 5px;"></span>
-            <span id="corpus-status-pill">10 DOCS INDEXED</span>
+            <span id="corpus-status-pill">0 DOCS INDEXED</span>
           </div>
         </div>
 
@@ -316,9 +308,9 @@
           <!-- Corpus Filter Bar -->
           <div class="corpus-filter-bar">
             <span style="color: var(--text-faint); margin-right: 4px;">Search In:</span>
-            <button class="corpus-filter-btn active" data-filter="all">All Documents (<span id="filter-count-all">10</span>)</button>
-            <button class="corpus-filter-btn" data-filter="personal">📁 My Personal Files Only (<span id="filter-count-personal">0</span>)</button>
-            <button class="corpus-filter-btn" data-filter="sample">Sample Research Papers (<span id="filter-count-sample">10</span>)</button>
+            <button class="corpus-filter-btn active" data-filter="all">All Documents (<span id="filter-count-all">0</span>)</button>
+            <button class="corpus-filter-btn" data-filter="files">📁 Uploaded Files (<span id="filter-count-files">0</span>)</button>
+            <button class="corpus-filter-btn" data-filter="notes">📝 Text Notes (<span id="filter-count-notes">0</span>)</button>
           </div>
 
           <div class="search-input-group">
@@ -332,29 +324,28 @@
                 name="queryInput"
                 type="text" 
                 class="terminal-search-input" 
-                placeholder="Search across all indexed documents (supports AND, OR, NOT, exact &quot;phrases&quot;)..." 
-                value="distributed consensus"
+                placeholder="Search across indexed files &amp; notes (supports AND, OR, NOT, exact &quot;phrases&quot;)..." 
+                value=""
                 autocomplete="off"
                 spellcheck="false"
               >
-              <button id="clear-search-btn" class="clear-search-btn" title="Clear query">✕</button>
+              <button id="clear-search-btn" class="clear-search-btn" title="Clear query" style="display: none;">✕</button>
             </div>
 
             <div class="latency-metric-chip" title="Execution latency measured in microseconds">
               <span>Latency:</span>
-              <span id="latency-val" class="latency-val">0.38 ms</span>
+              <span id="latency-val" class="latency-val">0.00 ms</span>
             </div>
           </div>
 
-          <!-- Quick Query Presets -->
+          <!-- Quick Query Syntax Examples -->
           <div class="query-presets-row">
-            <span class="presets-label">Preset Queries:</span>
-            <button class="preset-chip active" data-query="distributed consensus">"distributed consensus"</button>
-            <button class="preset-chip" data-query="byzantine fault">"byzantine fault"</button>
-            <button class="preset-chip" data-query="bm25 AND inverted">bm25 AND inverted</button>
-            <button class="preset-chip" data-query="varint d-gap">varint d-gap</button>
-            <button class="preset-chip" data-query="mechanical sympathy">mechanical sympathy</button>
-            <button class="preset-chip" data-query="porter stemmer">porter stemmer</button>
+            <span class="presets-label">Query Syntax:</span>
+            <button class="preset-chip" data-query="error OR warning">error OR warning</button>
+            <button class="preset-chip" data-query="react AND typescript">react AND typescript</button>
+            <button class="preset-chip" data-query="config NOT staging">config NOT staging</button>
+            <button class="preset-chip" data-query="&quot;function main&quot;">"function main"</button>
+            <button class="preset-chip" data-query="database">database</button>
           </div>
         </div>
 
@@ -364,7 +355,7 @@
           <div class="terminal-results-pane">
             <div class="pane-heading">
               <span class="pane-title">Ranked BM25 Results</span>
-              <span id="results-count-badge" class="pane-badge">Sorted by Score</span>
+              <span id="results-count-badge" class="pane-badge">0 Matches</span>
             </div>
             <div id="repl-results-list" class="results-list">
               <!-- Rendered via playground.js -->
@@ -382,9 +373,7 @@
                 <span>Analysis Stream (NFKD + Stopwords + Porter Stemmer)</span>
               </div>
               <div id="token-stream" class="token-pipeline-stream">
-                <span class="token-chip">distribut</span>
-                <span class="token-arrow">→</span>
-                <span class="token-chip">consensus</span>
+                <span class="token-chip" style="opacity: 0.5;">No active search tokens</span>
               </div>
             </div>
 
@@ -396,7 +385,7 @@
                 </svg>
                 <span>AST Query Evaluation Plan</span>
               </div>
-              <pre id="ast-plan-pre" class="ast-tree-pre">BinaryOp(AND, [Term("distribut"), Term("consensus")])</pre>
+              <pre id="ast-plan-pre" class="ast-tree-pre">EMPTY</pre>
             </div>
 
             <div class="internals-block">
@@ -409,11 +398,11 @@
               <div class="telemetry-grid">
                 <div class="telemetry-item">
                   <div class="telemetry-lbl">Candidates Scanned</div>
-                  <div id="telem-candidates" class="telemetry-val">10</div>
+                  <div id="telem-candidates" class="telemetry-val">0</div>
                 </div>
                 <div class="telemetry-item">
                   <div class="telemetry-lbl">Terms Looked Up</div>
-                  <div id="telem-terms" class="telemetry-val">2</div>
+                  <div id="telem-terms" class="telemetry-val">0</div>
                 </div>
                 <div class="telemetry-item">
                   <div class="telemetry-lbl">WAND Pruned</div>
@@ -421,7 +410,7 @@
                 </div>
                 <div class="telemetry-item">
                   <div class="telemetry-lbl">Avg Doc Length</div>
-                  <div id="telem-avgdl" class="telemetry-val">28 words</div>
+                  <div id="telem-avgdl" class="telemetry-val">0 terms</div>
                 </div>
               </div>
             </div>
