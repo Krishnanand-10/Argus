@@ -749,6 +749,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const noteModalCloseBtn = document.getElementById("note-modal-close-btn");
   const noteModalCancelBtn = document.getElementById("note-modal-cancel-btn");
   const btnDropzoneNote = document.getElementById("btn-dropzone-note");
+  const btnLeftAddNote = document.getElementById("btn-left-add-note");
 
   // Personal File Ingestion Elements
   const dropzone = document.getElementById("studio-dropzone");
@@ -828,6 +829,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (btnHeaderNote) btnHeaderNote.addEventListener("click", openNoteModal);
   if (btnDropzoneNote) btnDropzoneNote.addEventListener("click", openNoteModal);
+  if (btnLeftAddNote) btnLeftAddNote.addEventListener("click", openNoteModal);
   if (btnStatusNote) btnStatusNote.addEventListener("click", openNoteModal);
   if (noteModalCloseBtn) noteModalCloseBtn.addEventListener("click", closeNoteModal);
   if (noteModalCancelBtn) noteModalCancelBtn.addEventListener("click", closeNoteModal);
@@ -1063,10 +1065,10 @@ document.addEventListener("DOMContentLoaded", () => {
       studioStatusBar.style.display = allDocs.length > 0 ? "flex" : "none";
     }
     if (dropzone) {
-      dropzone.style.display = allDocs.length > 0 ? "none" : "flex";
+      dropzone.style.display = "flex";
     }
 
-    renderDocumentList();
+    renderDocumentList(docFilterInput ? docFilterInput.value : "");
     renderPersonalFilesList(fileDocs);
   }
 
@@ -1125,8 +1127,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Render Document List in Tab 2
+  // Render Document List in Left Column
   function renderDocumentList(filter = "") {
+    if (!studioDocList) return;
     filter = filter.toLowerCase().trim();
     const docs = Array.from(engine.documents.values()).filter(d => {
       if (!filter) return true;
@@ -1134,9 +1137,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     if (docs.length === 0) {
+      const emptyMsg = filter 
+        ? "No documents found matching filter." 
+        : 'No documents indexed yet. Drop files above or click "+ Write New Text Note" to start.';
       studioDocList.innerHTML = `
-        <div style="padding: 16px; text-align: center; color: var(--text-dim); font-size: 0.78rem;">
-          No documents found matching filter.
+        <div style="padding: 20px 14px; text-align: center; color: var(--text-dim); font-size: 0.74rem; line-height: 1.4;">
+          ${emptyMsg}
         </div>
       `;
       return;
@@ -1144,15 +1150,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     studioDocList.innerHTML = docs.map(d => {
       const length = engine.docLengths.get(d.id) || 0;
-      const personalBadge = d.isPersonal ? '<span class="file-pill-badge" style="font-size: 0.6rem; padding: 0 4px;">Personal</span>' : '';
+      const typeLabel = d.isFile ? '📁 File' : '📝 Note';
       return `
         <div class="doc-list-item" data-id="${d.id}">
           <div style="flex: 1; min-width: 0;">
-            <div class="doc-item-title" title="Click to view text">${escapeHtml(d.title)}</div>
+            <div class="doc-item-title" title="Click to inspect document">${escapeHtml(d.title)}</div>
             <div class="doc-item-sub">
-              ${personalBadge}
+              <span class="file-pill-badge" style="font-size: 0.6rem; padding: 0 4px;">${typeLabel}</span>
               <span style="color: var(--accent);">#${d.id}</span>
-              <span>${escapeHtml(d.path)}</span>
+              <span title="${escapeHtml(d.path)}" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;">${escapeHtml(d.path)}</span>
               <span>${length} terms</span>
             </div>
           </div>

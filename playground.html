@@ -79,111 +79,144 @@
     </div>
   </header>
 
-  <!-- Clean & Focused Studio Workspace -->
-  <main class="clean-studio-layout">
+  <!-- Clean & Focused 2-Column Split Workspace (Ingestion Left, Search & Results Right) -->
+  <main class="clean-split-layout">
 
-    <!-- Search Input Hero Card -->
-    <div class="clean-search-card">
-      <div class="clean-search-input-wrap">
-        <svg class="clean-search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <!-- Left Column: Ingestion & Document Corpus Manager -->
+    <aside class="clean-split-left">
+      <div class="split-pane-header">
+        <div class="split-pane-title">
+          <span>📁</span>
+          <span>Document Ingestion</span>
+        </div>
+        <span id="corpus-status-pill" class="pane-badge">0 DOCS INDEXED</span>
+      </div>
+
+      <!-- Dropzone for Local Files / Folders -->
+      <div id="studio-dropzone" class="clean-dropzone-box" title="Drop files or folder to index in browser memory">
+        <div style="font-size: 1.5rem; margin-bottom: 4px; color: var(--accent);">📁</div>
+        <div style="font-size: 0.82rem; font-weight: 600; color: #ffffff; margin-bottom: 2px;">Drop files or folder here</div>
+        <div style="font-size: 0.68rem; color: var(--text-dim); margin-bottom: 10px; line-height: 1.4;">
+          Supports .txt, .md, .json, .csv, code &amp; text files
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; width: 100%;">
+          <button id="btn-browse-files" class="btn-studio-action" style="flex: 1; min-width: 110px; height: 32px; font-size: 0.72rem; margin: 0; padding: 0 8px;">
+            📄 Choose Files...
+          </button>
+          <button id="btn-browse-folder" class="btn-studio-secondary" style="flex: 1; min-width: 110px; height: 32px; font-size: 0.72rem; padding: 0 8px;">
+            📁 Choose Folder...
+          </button>
+        </div>
+        <input type="file" id="local-file-input" multiple style="display: none;" accept=".txt,.md,.markdown,.json,.csv,.js,.ts,.tsx,.jsx,.py,.html,.css,.scss,.yml,.yaml,.sh,.sql,.log,.xml,.env">
+        <input type="file" id="local-folder-input" webkitdirectory directory multiple style="display: none;">
+      </div>
+
+      <!-- Quick Action: Write Note -->
+      <button id="btn-left-add-note" class="btn-studio-secondary" style="width: 100%; height: 32px; font-size: 0.72rem; display: flex; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0;">
+        <span>✍️</span>
+        <span>+ Write New Text Note</span>
+      </button>
+
+      <!-- Indexed Documents Header & Clear Controls -->
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px; flex-shrink: 0;">
+        <div class="split-pane-subtitle">
+          Indexed Documents (<span id="tab-doc-count" style="color: var(--accent);">0</span>)
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button id="btn-clear-personal-files" class="btn-studio-secondary" style="font-size: 0.64rem; padding: 2px 6px; color: #f43f5e;" title="Remove uploaded files">
+            Clear Files
+          </button>
+          <button id="btn-reset-corpus" class="btn-studio-secondary" style="font-size: 0.64rem; padding: 2px 6px; color: #f43f5e;" title="Clear all documents &amp; notes">
+            Clear All
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Filter for Documents List -->
+      <div style="position: relative; flex-shrink: 0;">
+        <input 
+          id="doc-filter-input" 
+          type="text" 
+          class="studio-input" 
+          placeholder="Filter documents by name or path..." 
+          style="height: 30px; font-size: 0.72rem; padding-left: 28px;"
+        >
+        <svg style="position: absolute; left: 8px; top: 8px; opacity: 0.4;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/>
           <line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        <input 
-          id="repl-search-input" 
-          name="queryInput"
-          type="text" 
-          class="clean-search-input" 
-          placeholder="Search indexed files &amp; notes (supports AND, OR, NOT, &quot;exact phrases&quot;)..." 
-          value=""
-          autocomplete="off"
-          spellcheck="false"
-        >
-        <button id="clear-search-btn" class="clear-search-btn" title="Clear query" style="display: none;">✕</button>
-        <div class="clean-search-latency" title="Search execution latency">
-          <span>Latency:</span> <strong id="latency-val">0.00 ms</strong>
+      </div>
+
+      <!-- Scrollable Document List -->
+      <div id="studio-doc-list" class="doc-list-scroll">
+        <!-- Rendered dynamically by playground.js -->
+      </div>
+
+      <!-- Compatibility elements -->
+      <div style="display: none;">
+        <span id="personal-file-count">0 files</span>
+        <button id="btn-dropzone-note"></button>
+        <div id="studio-status-bar"></div>
+        <button id="btn-status-upload"></button>
+        <button id="btn-status-note"></button>
+        <span id="filter-count-personal">0</span>
+        <div id="personal-files-list"></div>
+      </div>
+    </aside>
+
+    <!-- Right Column: Hero Search & Ranked BM25 Results Feed -->
+    <section class="clean-split-right">
+      <!-- Search Input Hero Card -->
+      <div class="clean-search-card">
+        <div class="clean-search-input-wrap">
+          <svg class="clean-search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input 
+            id="repl-search-input" 
+            name="queryInput"
+            type="text" 
+            class="clean-search-input" 
+            placeholder="Search indexed files &amp; notes (supports AND, OR, NOT, &quot;exact phrases&quot;)..." 
+            value=""
+            autocomplete="off"
+            spellcheck="false"
+          >
+          <button id="clear-search-btn" class="clear-search-btn" title="Clear query" style="display: none;">✕</button>
+          <div class="clean-search-latency" title="Search execution latency">
+            <span>Latency:</span> <strong id="latency-val">0.00 ms</strong>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Filter Pills & Presets Bar -->
-    <div class="clean-filter-bar">
-      <div class="clean-filter-pills">
-        <button class="clean-filter-pill corpus-filter-btn active" data-filter="all">All Documents (<span id="filter-count-all">0</span>)</button>
-        <button class="clean-filter-pill corpus-filter-btn" data-filter="files">📁 Files (<span id="filter-count-files">0</span>)</button>
-        <button class="clean-filter-pill corpus-filter-btn" data-filter="notes">📝 Notes (<span id="filter-count-notes">0</span>)</button>
+      <!-- Filter Pills & Presets Bar -->
+      <div class="clean-filter-bar">
+        <div class="clean-filter-pills">
+          <button class="clean-filter-pill corpus-filter-btn active" data-filter="all">All Documents (<span id="filter-count-all">0</span>)</button>
+          <button class="clean-filter-pill corpus-filter-btn" data-filter="files">📁 Files (<span id="filter-count-files">0</span>)</button>
+          <button class="clean-filter-pill corpus-filter-btn" data-filter="notes">📝 Notes (<span id="filter-count-notes">0</span>)</button>
+        </div>
+
+        <div class="clean-presets-row">
+          <span class="clean-presets-label">Examples:</span>
+          <button class="preset-chip" data-query="error OR warning">error OR warning</button>
+          <button class="preset-chip" data-query="react AND typescript">react AND typescript</button>
+          <button class="preset-chip" data-query="&quot;function main&quot;">"function main"</button>
+          <button class="preset-chip" data-query="database">database</button>
+        </div>
       </div>
 
-      <div class="clean-presets-row">
-        <span class="clean-presets-label">Examples:</span>
-        <button class="preset-chip" data-query="error OR warning">error OR warning</button>
-        <button class="preset-chip" data-query="react AND typescript">react AND typescript</button>
-        <button class="preset-chip" data-query="&quot;function main&quot;">"function main"</button>
-        <button class="preset-chip" data-query="database">database</button>
-      </div>
-    </div>
-
-    <!-- Clean Dropzone Hero -->
-    <div id="studio-dropzone" class="clean-dropzone-hero">
-      <div class="clean-dropzone-icon">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-          <line x1="12" y1="11" x2="12" y2="17"/>
-          <polyline points="9 14 12 11 15 14"/>
-        </svg>
-      </div>
-      <div class="clean-dropzone-title">Drop your files or folder to search privately</div>
-      <div class="clean-dropzone-sub">
-        Indexed securely in your browser's memory using typed inverted index. Supports .txt, .md, .json, .csv, code, and text files.
-      </div>
-      <div class="clean-dropzone-btns">
-        <button id="btn-browse-files" class="btn-studio-action" style="width: auto; height: 36px; padding: 0 16px; margin: 0; font-size: 0.78rem;">
-          📄 Choose Files...
-        </button>
-        <button id="btn-browse-folder" class="btn-studio-secondary" style="height: 36px; padding: 0 16px; font-size: 0.78rem;">
-          📁 Choose Entire Folder...
-        </button>
-        <button id="btn-dropzone-note" class="btn-studio-secondary" style="height: 36px; padding: 0 16px; font-size: 0.78rem;">
-          📝 Add Text Note...
-        </button>
-      </div>
-      <input type="file" id="local-file-input" multiple style="display: none;" accept=".txt,.md,.markdown,.json,.csv,.js,.ts,.tsx,.jsx,.py,.html,.css,.scss,.yml,.yaml,.sh,.sql,.log,.xml,.env">
-      <input type="file" id="local-folder-input" webkitdirectory directory multiple style="display: none;">
-    </div>
-
-    <!-- Corpus Status & Actions Bar -->
-    <div id="studio-status-bar" class="clean-status-bar" style="display: none;">
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span class="status-dot"></span>
-        <span id="corpus-status-pill">0 DOCS INDEXED</span>
-        <span style="color: var(--text-faint);">•</span>
-        <span id="personal-file-count" style="color: var(--text-soft);">0 files</span>
-      </div>
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <button id="btn-status-upload" class="btn-studio-secondary" style="font-size: 0.68rem; padding: 3px 8px;" title="Upload more files">
-          + Add Files
-        </button>
-        <button id="btn-status-note" class="btn-studio-secondary" style="font-size: 0.68rem; padding: 3px 8px;" title="Write a note">
-          + Add Note
-        </button>
-        <button id="btn-clear-personal-files" class="btn-studio-secondary" style="font-size: 0.68rem; padding: 3px 8px; color: #f43f5e;" title="Remove uploaded files">
-          Clear Files
-        </button>
-        <button id="btn-reset-corpus" class="btn-studio-secondary" style="font-size: 0.68rem; padding: 3px 8px; color: #f43f5e;" title="Clear all documents &amp; notes">
-          Clear All
-        </button>
-      </div>
-    </div>
-
-    <!-- Results Section -->
-    <section class="clean-results-section">
-      <div class="clean-results-header">
-        <span class="clean-results-title">Ranked Search Results</span>
-        <span id="results-count-badge" class="pane-badge">0 Matches</span>
-      </div>
-      <div id="repl-results-list" class="results-list">
-        <!-- Rendered via playground.js -->
-      </div>
+      <!-- Results Section -->
+      <section class="clean-results-section">
+        <div class="clean-results-header">
+          <span class="clean-results-title">Ranked Search Results</span>
+          <span id="results-count-badge" class="pane-badge">0 Matches</span>
+        </div>
+        <div id="repl-results-list" class="results-list">
+          <!-- Rendered via playground.js -->
+        </div>
+      </section>
     </section>
 
   </main>
@@ -299,15 +332,6 @@
         <button id="btn-ingest-json" class="btn-studio-action" style="height: 32px; font-size: 0.74rem; margin-top: 6px;">
           Ingest JSON Documents
         </button>
-      </div>
-
-      <!-- Hidden compatibility elements for controller -->
-      <div style="display: none;">
-        <span id="tab-doc-count">0</span>
-        <span id="filter-count-personal">0</span>
-        <div id="personal-files-list"></div>
-        <div id="studio-doc-list"></div>
-        <input id="doc-filter-input" type="text">
       </div>
     </div>
   </aside>

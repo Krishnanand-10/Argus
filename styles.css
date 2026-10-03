@@ -2215,3 +2215,102 @@ mark.search-highlight,
   border-radius: 3px;
   box-shadow: 0 0 8px rgba(0, 210, 255, 0.25);
 }
+
+/* ==========================================================================
+   Clean 2-Column Split Layout (Ingestion Left, Search Right)
+   ========================================================================== */
+.clean-split-layout {
+  min-height: calc(100vh - 61px);
+  padding: 24px 24px 40px;
+  max-width: 1440px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1060px) {
+  .clean-split-layout {
+    grid-template-columns: 1fr;
+    padding: 16px;
+    gap: 20px;
+  }
+  .clean-split-left {
+    position: static;
+    max-height: none;
+  }
+}
+
+.clean-split-left {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  position: sticky;
+  top: 76px;
+  max-height: calc(100vh - 96px);
+  overflow: hidden;
+}
+
+.split-pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.split-pane-title {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.split-pane-subtitle {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.clean-dropzone-box {
+  background: #08080c;
+  border: 1.5px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  padding: 16px 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.clean-dropzone-box:hover,
+.clean-dropzone-box.dragover {
+  border-color: var(--accent);
+  background: rgba(0, 210, 255, 0.03);
+}
+
+.clean-split-right {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
