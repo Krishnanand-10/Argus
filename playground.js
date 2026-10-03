@@ -235,22 +235,26 @@ async function extractPdfText(file) {
     const content = await page.getTextContent();
     let pageStr = "";
     let lastY = null;
+    let lastX = null;
 
     for (const item of content.items) {
       if (!item.str) continue;
       const text = item.str;
       const y = item.transform ? item.transform[5] : null;
+      const x = item.transform ? item.transform[4] : null;
 
       if (lastY !== null && y !== null) {
         const yDiff = Math.abs(y - lastY);
-        if (yDiff > 14) {
-          // Paragraph break or section break
+        const isWrapping = lastX !== null && x !== null && x < lastX - 25;
+
+        if (yDiff > 24) {
+          // Substantial vertical gap -> paragraph break
           pageStr += "\n\n";
-        } else if (yDiff > 3 || item.hasEOL) {
-          // Line break
+        } else if ((yDiff > 8 && isWrapping) || yDiff > 18 || item.hasEOL) {
+          // Newline on line-wrap or significant drop
           pageStr += "\n";
         } else {
-          // Word spacing on same line
+          // Words continuing on same line / row
           if (pageStr && !pageStr.endsWith(" ") && !pageStr.endsWith("\n")) {
             pageStr += " ";
           }
@@ -259,6 +263,7 @@ async function extractPdfText(file) {
 
       pageStr += text;
       lastY = y;
+      lastX = x;
     }
 
     if (pageStr.trim()) {
