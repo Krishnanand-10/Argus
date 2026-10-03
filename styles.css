@@ -2660,3 +2660,71 @@ mark.search-highlight,
   50% { width: 70%; margin-left: 30%; }
   100% { width: 100%; margin-left: 0; }
 }
+
+/* Custom In-App Error & Notice Box Modal (Replaces browser alert popups) */
+.error-modal-box {
+  background: #141419;
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  border-radius: var(--radius-lg);
+  max-width: 440px;
+  width: 90vw;
+  padding: 20px 22px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.95), 0 0 30px rgba(244, 63, 94, 0.12);
+  display: flex;
+  flex-direction: column;
+  animation: modalScaleIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.error-box-icon-wrap {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(244, 63, 94, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(244, 63, 94, 0.28);
+  flex-shrink: 0;
+}
+
+.error-box-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 3px 0;
+  font-family: var(--font-sans);
+}
+
+.error-box-tag {
+  display: inline-block;
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  color: #f43f5e;
+  font-family: var(--font-mono);
+}
+
+.error-box-message {
+  font-size: 0.82rem;
+  color: #cbd5e1;
+  line-height: 1.55;
+  margin: 6px 0 0 0;
+  font-family: var(--font-sans);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 12px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+

@@ -536,7 +536,38 @@
         </div>
       </div>
       <div id="modal-doc-body" class="studio-modal-body">
-        <!-- Rendered by playground.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Error & Notice Box Modal (Replaces native browser "localhost:8080 says" dialogs) -->
+  <div id="error-modal-backdrop" class="studio-modal-backdrop">
+    <div class="error-modal-box">
+      <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div class="error-box-icon-wrap">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+          <div>
+            <h3 id="error-box-title" class="error-box-title">Unable to Process</h3>
+            <span id="error-box-tag" class="error-box-tag">Notice</span>
+          </div>
+        </div>
+        <button id="error-box-close-btn" class="clear-search-btn" style="position: static; display: block; font-size: 1.1rem;" title="Close">✕</button>
+      </div>
+      
+      <p id="error-box-message" class="error-box-message">
+        No readable text or code found in the selected files.
+      </p>
+
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;">
+        <button id="error-box-ok-btn" class="btn-studio-action" style="height: 34px; padding: 0 18px; font-size: 0.78rem;">
+          Got it
+        </button>
       </div>
     </div>
   </div>

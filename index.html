@@ -658,9 +658,9 @@ console.log(results[0].title, <span class="cmd-flag">'Score:'</span>, results[0]
         Zero external dependencies, mechanical sympathy for the V8 runtime, and sub-millisecond retrieval out of the box.
       </p>
       <div class="bottom-cta-row">
-        <button onclick="navigator.clipboard.writeText('npm install argus-search'); alert('Copied: npm install argus-search');" class="terminal-copy-pill">
+        <button onclick="navigator.clipboard.writeText('npm install argus-search'); const s = this.querySelector('.cmd-text'); const orig = s.textContent; s.textContent = 'Copied!'; setTimeout(() => s.textContent = orig, 2000);" class="terminal-copy-pill">
           <span class="terminal-prompt">$</span>
-          <span>npm install argus-search</span>
+          <span class="cmd-text">npm install argus-search</span>
         </button>
         <a href="playground.html" target="_blank" class="btn-terminal-primary">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

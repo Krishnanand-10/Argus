@@ -973,6 +973,38 @@ document.addEventListener("DOMContentLoaded", () => {
     }, duration);
   }
 
+  // Custom In-App Error & Notice Box (Replaces native browser "localhost:8080 says" dialogs)
+  const errorModalBackdrop = document.getElementById("error-modal-backdrop");
+  const errorBoxTitle = document.getElementById("error-box-title");
+  const errorBoxMessage = document.getElementById("error-box-message");
+  const errorBoxCloseBtn = document.getElementById("error-box-close-btn");
+  const errorBoxOkBtn = document.getElementById("error-box-ok-btn");
+  const errorBoxTag = document.getElementById("error-box-tag");
+
+  function showErrorBox(title, message, tag = "Notice") {
+    if (errorBoxTitle) errorBoxTitle.textContent = title;
+    if (errorBoxMessage) errorBoxMessage.textContent = message;
+    if (errorBoxTag) errorBoxTag.textContent = tag;
+    if (errorModalBackdrop) {
+      errorModalBackdrop.classList.add("open");
+      if (errorBoxOkBtn) errorBoxOkBtn.focus();
+    }
+  }
+
+  function closeErrorBox() {
+    if (errorModalBackdrop) {
+      errorModalBackdrop.classList.remove("open");
+    }
+  }
+
+  if (errorBoxCloseBtn) errorBoxCloseBtn.addEventListener("click", closeErrorBox);
+  if (errorBoxOkBtn) errorBoxOkBtn.addEventListener("click", closeErrorBox);
+  if (errorModalBackdrop) {
+    errorModalBackdrop.addEventListener("click", (e) => {
+      if (e.target === errorModalBackdrop) closeErrorBox();
+    });
+  }
+
   // Note Modal toggles
   function openNoteModal() {
     if (noteModalBackdrop) {
@@ -1671,7 +1703,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Do NOT overwrite searchInput so all newly added documents stay visible!
       performSearch(searchInput.value);
     } else {
-      alert("No readable text, markdown, code, or JSON files found in selected files.");
+      showErrorBox("Unsupported File Format", "No readable text, markdown, code, or JSON files found in selected files. Please choose text or code documents.", "File Notice");
     }
   }
 
@@ -2019,7 +2051,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const rawBody = docBodyInput.value.trim();
 
     if (!rawTitle && !rawBody) {
-      alert("Please provide at least a title or text content to index.");
+      showErrorBox("Missing Note Content", "Please provide a title or body text before indexing into memory.", "Input Notice");
       return;
     }
 
@@ -2188,13 +2220,13 @@ document.addEventListener("DOMContentLoaded", () => {
     btnIngestJson.addEventListener("click", () => {
       const raw = bulkJsonInput.value.trim();
       if (!raw) {
-        alert("Please paste a JSON array of documents.");
+        showErrorBox("Empty JSON", "Please paste a JSON array of documents before clicking import.", "JSON Notice");
         return;
       }
       try {
         const parsed = JSON.parse(raw);
         if (!Array.isArray(parsed)) {
-          alert("Expected an array of documents: [{ title, body }]");
+          showErrorBox("Invalid Format", "Expected an array of documents: [{ \"title\": \"...\", \"body\": \"...\" }]", "JSON Error");
           return;
         }
         let count = 0;
@@ -2216,7 +2248,7 @@ document.addEventListener("DOMContentLoaded", () => {
         bulkJsonInput.value = "";
         closeInternals();
       } catch (err) {
-        alert("JSON Syntax Error: " + err.message);
+        showErrorBox("JSON Syntax Error", err.message, "JSON Error");
       }
     });
   }
@@ -2286,6 +2318,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Escape") {
       if (modalBackdrop) modalBackdrop.classList.remove("open");
       if (noteModalBackdrop) noteModalBackdrop.classList.remove("open");
+      if (errorModalBackdrop) errorModalBackdrop.classList.remove("open");
       if (internalsDrawer) internalsDrawer.classList.remove("open");
       if (internalsBackdrop) internalsBackdrop.classList.remove("open");
     }
