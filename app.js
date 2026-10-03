@@ -651,7 +651,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="result-card">
             <div class="result-card-top">
               <span class="result-doc-tag">Doc #${r.docId} · ${r.path}</span>
-              <span class="result-bm25-badge">BM25: ${r.score}</span>
+              <span class="result-bm25-badge" title="Relevance score calculated via Okapi BM25 ranking algorithm">Relevance: ${r.score}</span>
             </div>
             <div class="result-title">${r.title}</div>
             <div class="result-snippet">${r.snippet}</div>
@@ -731,11 +731,12 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           const content = await file.text();
           if (content.includes('\0')) continue;
+          const extracted = extractReadableDocument(content, file.name);
           engine.addDocument({
             id: engine.documents.size + 1,
-            title: file.name,
+            title: extracted.title || file.name,
             path: `personal/${file.name}`,
-            body: content,
+            body: extracted.body || content,
           });
           added++;
           if (!firstTerm) {

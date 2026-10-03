@@ -348,6 +348,29 @@ function extractReadableDocument(rawContent, filename = "") {
   };
 }
 
+function escapeHtml(str) {
+  return (str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function highlightTermsInText(str, stems, queryWords = []) {
+  if (!str) return "";
+  const tokens = str.split(/([\p{L}\p{N}]+)/u);
+  return tokens.map(token => {
+    if (!token) return "";
+    const clean = token.toLowerCase();
+    const s = PorterStemmer(clean);
+    const isMatch = (stems && stems.length > 0 && stems.includes(s)) ||
+                    (queryWords && queryWords.includes(clean));
+    if (isMatch) {
+      return `<mark class="search-highlight">${escapeHtml(token)}</mark>`;
+    }
+    return escapeHtml(token);
+  }).join("");
+}
+
 // ============================================================================
 // 5. In-Memory Search Engine
 // ============================================================================
@@ -558,6 +581,7 @@ class StudioEngine {
 
     const results = ranked.slice(0, 15).map(item => {
       const doc = this.documents.get(item.docId);
+      const snippetData = this.generateSnippet(doc.body, stems, queryStr, doc.title);
       return {
         docId: doc.id,
         title: doc.title,
@@ -570,7 +594,8 @@ class StudioEngine {
         isHtml: !!doc.isHtml,
         fileSize: doc.fileSize || 0,
         score: +item.score.toFixed(2),
-        snippet: this.generateSnippet(doc.body, stems),
+        snippet: snippetData.html,
+        matchCount: snippetData.matchCount,
         matchedStems: Array.from(item.matchedStems),
         offsets: item.positions.slice(0, 4)
       };
@@ -590,43 +615,94 @@ class StudioEngine {
     };
   }
 
-  generateSnippet(body, stems) {
-    if (!body) return "";
-    const cleanBody = body.replace(/###\s+/g, "").replace(/•\s+/g, "");
-    const words = cleanBody.split(/\s+/);
-    let bestIdx = 0;
+  generateSnippet(body, stems, rawQuery = "", title = "") {
+    if (!body && !title) return { html: "", matchCount: 0 };
 
-    for (let i = 0; i < words.length; i++) {
-      const clean = words[i].toLowerCase().replace(/[^\w]/g, "");
-      const s = PorterStemmer(clean);
-      if (stems.includes(s)) {
-        bestIdx = i;
-        break;
+    const queryWords = (rawQuery || "")
+      .toLowerCase()
+      .split(/\s+/)
+      .map(w => w.replace(/[^\w]/g, ""))
+      .filter(w => w.length > 0);
+
+    const cleanBody = (body || "").replace(/###\s+/g, "").replace(/•\s+/g, "");
+
+    // Split into sentences / meaningful clauses
+    const rawSentences = cleanBody
+      .split(/(?<=[.!?\n])\s+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+
+    let matchingSentences = [];
+    let totalMatches = 0;
+
+    for (const sent of rawSentences) {
+      const wordsInSent = sent.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+      let matchCountInSent = 0;
+      for (const w of wordsInSent) {
+        const s = PorterStemmer(w);
+        if ((stems && stems.includes(s)) || queryWords.includes(w)) {
+          matchCountInSent++;
+        }
+      }
+      if (matchCountInSent > 0) {
+        totalMatches += matchCountInSent;
+        matchingSentences.push({ text: sent, count: matchCountInSent });
       }
     }
 
-    const start = Math.max(0, bestIdx - 6);
-    const end = Math.min(words.length, bestIdx + 16);
-    const slice = words.slice(start, end);
+    matchingSentences.sort((a, b) => b.count - a.count);
 
-    const highlighted = slice.map(word => {
-      const clean = word.toLowerCase().replace(/[^\w]/g, "");
-      const s = PorterStemmer(clean);
-      if (stems.includes(s)) {
-        return `<mark>${escapeHtml(word)}</mark>`;
+    if (matchingSentences.length > 0) {
+      const best = matchingSentences[0].text;
+      let excerpt = best;
+      if (excerpt.length > 180) {
+        const words = excerpt.split(/\s+/);
+        let matchIdx = 0;
+        for (let i = 0; i < words.length; i++) {
+          const clean = words[i].toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+          if ((stems && stems.includes(PorterStemmer(clean))) || queryWords.includes(clean)) {
+            matchIdx = i;
+            break;
+          }
+        }
+        const start = Math.max(0, matchIdx - 5);
+        const end = Math.min(words.length, matchIdx + 16);
+        excerpt = (start > 0 ? "… " : "") + words.slice(start, end).join(" ") + (end < words.length ? " …" : "");
       }
-      return escapeHtml(word);
-    }).join(" ");
 
-    return (start > 0 ? "… " : "") + highlighted + (end < words.length ? " …" : "");
+      const highlighted = highlightTermsInText(excerpt, stems, queryWords);
+      return {
+        html: highlighted,
+        matchCount: totalMatches
+      };
+    }
+
+    // Check if query term was in title
+    let titleMatches = 0;
+    if (title) {
+      const titleWords = title.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+      for (const w of titleWords) {
+        if ((stems && stems.includes(PorterStemmer(w))) || queryWords.includes(w)) {
+          titleMatches++;
+        }
+      }
+    }
+
+    if (titleMatches > 0) {
+      const preview = (cleanBody || "").slice(0, 110).trim();
+      return {
+        html: `<span style="color: var(--accent); font-weight: 500;">Matched in document title</span> ${preview ? `· <span style="color: var(--text-dim); font-size: 0.75rem;">Preview: "${escapeHtml(preview)}…"</span>` : ''}`,
+        matchCount: titleMatches
+      };
+    }
+
+    // Default fallback
+    const fallbackText = cleanBody.slice(0, 130).trim();
+    return {
+      html: escapeHtml(fallbackText) + (cleanBody.length > 130 ? " …" : ""),
+      matchCount: 0
+    };
   }
-}
-
-function escapeHtml(str) {
-  return (str || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }
 
 // ============================================================================
@@ -716,11 +792,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const modalDocTitle = document.getElementById("modal-doc-title");
   const modalDocSub = document.getElementById("modal-doc-sub");
   const modalDocBody = document.getElementById("modal-doc-body");
+  const modalBtnExcerpts = document.getElementById("modal-btn-excerpts");
   const modalBtnFormatted = document.getElementById("modal-btn-formatted");
   const modalBtnRaw = document.getElementById("modal-btn-raw");
   const modalCopyBtn = document.getElementById("modal-copy-btn");
   let activeModalDocId = null;
-  let currentModalViewMode = "formatted"; // 'formatted' | 'raw'
+  let currentModalViewMode = "excerpts"; // 'excerpts' | 'formatted' | 'raw'
 
   // Toast
   const toastNotice = document.getElementById("toast-notice");
@@ -909,6 +986,12 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    const q = searchInput.value.trim();
+    const cleanQ = q.replace(/"/g, "");
+    const tokens = tokenize(cleanQ);
+    const stems = tokens.map(t => t.stem);
+    const queryWords = cleanQ.toLowerCase().split(/\s+/).map(w => w.replace(/[^\w]/g, "")).filter(Boolean);
+
     resultsContainer.innerHTML = response.results.map((res, idx) => {
       const matchTags = res.matchedStems
         ? res.matchedStems.map(s => `<span class="matched-term-tag">${escapeHtml(s)}</span>`).join("")
@@ -920,18 +1003,25 @@ document.addEventListener("DOMContentLoaded", () => {
         ? `<span style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-dim); margin-left: 6px;">(${escapeHtml(res.fileName)})</span>`
         : "";
 
+      const highlightedTitle = highlightTermsInText(res.title, stems, queryWords);
+
       return `
         <article class="result-card" data-doc-id="${res.docId}">
           <div class="result-header">
             <span class="result-rank-num">#${idx + 1}</span>
             <div style="flex: 1; min-width: 0;">
               <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px; flex-wrap: wrap;">
-                <h3 class="result-title">${escapeHtml(res.title)}${fileSub}</h3>
+                <h3 class="result-title">${highlightedTitle}${fileSub}</h3>
                 ${typeBadge}
               </div>
               <div class="result-path">${escapeHtml(res.path)}</div>
             </div>
-            <span class="bm25-score-pill">BM25: ${res.score.toFixed(2)}</span>
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+              <span class="bm25-score-pill" title="Okapi BM25 relevance score calculated by the search engine based on term frequency, word rarity, and document length">
+                ⚡ Relevance: ${res.score.toFixed(2)}
+              </span>
+              ${res.matchCount > 0 ? `<span class="match-count-badge">🎯 ${res.matchCount} match${res.matchCount === 1 ? '' : 'es'}</span>` : ''}
+            </div>
           </div>
 
           <div class="result-snippet">${res.snippet}</div>
@@ -940,7 +1030,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <div style="display: flex; gap: 4px; flex-wrap: wrap;">
               ${matchTags}
             </div>
-            <span style="margin-left: auto;">DocID: #${res.docId}</span>
+            <span style="margin-left: auto;">Click card to inspect excerpts &amp; full document ↗</span>
           </div>
         </article>
       `;
@@ -1228,11 +1318,18 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!doc) return;
     activeModalDocId = docId;
 
-    modalDocTitle.textContent = doc.title;
+    const q = searchInput.value.trim();
+    const cleanQ = q.replace(/"/g, "");
+    const tokens = tokenize(cleanQ);
+    const stems = tokens.map(t => t.stem);
+    const queryWords = cleanQ.toLowerCase().split(/\s+/).map(w => w.replace(/[^\w]/g, "")).filter(Boolean);
+
+    modalDocTitle.innerHTML = highlightTermsInText(doc.title, stems, queryWords);
     const fileLabel = doc.fileName && doc.fileName !== doc.title ? ` · <span>${escapeHtml(doc.fileName)}</span>` : "";
     const typeLabel = doc.docType || (doc.isFile ? "Uploaded File" : "Text Note");
     const termCount = engine.docLengths.get(doc.id) || 0;
     const words = doc.body ? doc.body.trim().split(/\s+/).length : 0;
+    const queryPill = q ? `<span class="match-count-badge" style="color: var(--accent);">🔍 Query: "${escapeHtml(q)}"</span>` : "";
 
     modalDocSub.innerHTML = `
       <span>Doc #${doc.id}</span>
@@ -1245,7 +1342,21 @@ document.addEventListener("DOMContentLoaded", () => {
       <span>${termCount} indexed terms</span>
       <span>•</span>
       <span class="file-pill-badge" style="font-size:0.62rem; padding: 1px 6px;">${escapeHtml(typeLabel)}</span>
+      ${queryPill}
     `;
+
+    // Default to 'excerpts' view if there is an active search query and excerpts button exists
+    if (q && modalBtnExcerpts) {
+      currentModalViewMode = "excerpts";
+      modalBtnExcerpts.classList.add("active");
+      if (modalBtnFormatted) modalBtnFormatted.classList.remove("active");
+      if (modalBtnRaw) modalBtnRaw.classList.remove("active");
+    } else {
+      currentModalViewMode = "formatted";
+      if (modalBtnFormatted) modalBtnFormatted.classList.add("active");
+      if (modalBtnExcerpts) modalBtnExcerpts.classList.remove("active");
+      if (modalBtnRaw) modalBtnRaw.classList.remove("active");
+    }
 
     renderModalContent(doc);
     modalBackdrop.classList.add("open");
@@ -1260,29 +1371,95 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Formatted Clean Reading View
     const q = searchInput.value.trim();
-    const tokens = tokenize(q.replace(/"/g, ""));
+    const cleanQ = q.replace(/"/g, "");
+    const tokens = tokenize(cleanQ);
     const stems = tokens.map(t => t.stem);
+    const queryWords = cleanQ.toLowerCase().split(/\s+/).map(w => w.replace(/[^\w]/g, "")).filter(Boolean);
 
-    modalDocBody.innerHTML = formatDocumentContent(doc.body, stems);
+    if (currentModalViewMode === "excerpts") {
+      modalDocBody.innerHTML = formatMatchedExcerpts(doc.body, stems, queryWords);
+      return;
+    }
+
+    // Formatted Clean Reading View
+    modalDocBody.innerHTML = formatDocumentContent(doc.body, stems, queryWords);
+
+    // Auto-scroll to first highlighted search term if query exists
+    if (q) {
+      setTimeout(() => {
+        const firstMark = modalDocBody.querySelector("mark");
+        if (firstMark) {
+          firstMark.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 100);
+    }
   }
 
-  function highlightTermsInText(str, stems) {
-    if (!str) return "";
-    const words = str.split(/(\s+)/);
-    return words.map(w => {
-      if (/^\s+$/.test(w)) return w;
-      const clean = w.toLowerCase().replace(/[^\w]/g, "");
-      const s = PorterStemmer(clean);
-      if (stems && stems.length > 0 && stems.includes(s)) {
-        return `<mark>${escapeHtml(w)}</mark>`;
+  function formatMatchedExcerpts(text, stems, queryWords) {
+    if (!text) return '<div style="color: var(--text-dim); text-align: center; padding: 20px;">Empty document content</div>';
+
+    const lines = text.split("\n");
+    let currentSection = "Document Overview";
+    let matchedBlocks = [];
+
+    for (let rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) continue;
+
+      if (line.startsWith("### ")) {
+        currentSection = line.replace(/^###\s+/, "");
+        continue;
       }
-      return escapeHtml(w);
-    }).join("");
+
+      const words = line.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+      const hasMatch = words.some(w => (stems && stems.includes(PorterStemmer(w))) || (queryWords && queryWords.includes(w)));
+
+      if (hasMatch) {
+        const highlighted = highlightTermsInText(line.replace(/^•\s+/, ""), stems, queryWords);
+        matchedBlocks.push({
+          section: currentSection,
+          isBullet: line.startsWith("• "),
+          html: highlighted
+        });
+      }
+    }
+
+    if (matchedBlocks.length === 0) {
+      return `
+        <div style="padding: 32px 20px; text-align: center; color: var(--text-dim);">
+          <div style="font-size: 1.05rem; margin-bottom: 8px; color: #ffffff; font-weight: 600;">No body text matched your query directly</div>
+          <p style="font-size: 0.8rem; max-width: 440px; margin: 0 auto 16px; line-height: 1.5;">
+            The search terms matched in the document title or metadata. Click "Reading View" above to read the full document.
+          </p>
+        </div>
+      `;
+    }
+
+    let out = `
+      <div style="margin-bottom: 18px; padding: 10px 16px; background: rgba(0, 210, 255, 0.06); border: 1px solid var(--accent-border); border-radius: 6px; font-family: var(--font-mono); font-size: 0.74rem; color: var(--accent); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+        <span>🎯 Showing ${matchedBlocks.length} matched passage${matchedBlocks.length === 1 ? '' : 's'} containing your search terms</span>
+        <span style="color: var(--text-dim); font-size: 0.68rem;">Switch to "Reading View" for full document</span>
+      </div>
+    `;
+
+    let lastSection = "";
+    for (const b of matchedBlocks) {
+      if (b.section !== lastSection) {
+        out += `<h4 class="modal-content-h4" style="margin-top: 18px;">${escapeHtml(b.section)}</h4>`;
+        lastSection = b.section;
+      }
+      if (b.isBullet) {
+        out += `<ul class="modal-content-list" style="margin-bottom: 10px;"><li>${b.html}</li></ul>`;
+      } else {
+        out += `<p class="modal-content-p" style="margin-bottom: 10px;">${b.html}</p>`;
+      }
+    }
+
+    return out;
   }
 
-  function formatDocumentContent(text, stems) {
+  function formatDocumentContent(text, stems, queryWords) {
     if (!text) return '<div style="color: var(--text-dim); text-align: center; padding: 20px;">Empty document content</div>';
 
     const lines = text.split("\n");
@@ -1298,15 +1475,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (line.startsWith("### ")) {
         if (inList) { html += "</ul>"; inList = false; }
-        const hText = highlightTermsInText(line.replace(/^###\s+/, ""), stems);
+        const hText = highlightTermsInText(line.replace(/^###\s+/, ""), stems, queryWords);
         html += `<h4 class="modal-content-h4">${hText}</h4>`;
       } else if (line.startsWith("• ")) {
         if (!inList) { html += '<ul class="modal-content-list">'; inList = true; }
-        const liText = highlightTermsInText(line.replace(/^•\s+/, ""), stems);
+        const liText = highlightTermsInText(line.replace(/^•\s+/, ""), stems, queryWords);
         html += `<li>${liText}</li>`;
       } else {
         if (inList) { html += "</ul>"; inList = false; }
-        const pText = highlightTermsInText(line, stems);
+        const pText = highlightTermsInText(line, stems, queryWords);
         html += `<p class="modal-content-p">${pText}</p>`;
       }
     }
@@ -1316,10 +1493,23 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Modal View Toggle & Actions
+  if (modalBtnExcerpts) {
+    modalBtnExcerpts.addEventListener("click", () => {
+      currentModalViewMode = "excerpts";
+      modalBtnExcerpts.classList.add("active");
+      if (modalBtnFormatted) modalBtnFormatted.classList.remove("active");
+      if (modalBtnRaw) modalBtnRaw.classList.remove("active");
+      if (activeModalDocId !== null) {
+        renderModalContent(engine.documents.get(activeModalDocId));
+      }
+    });
+  }
+
   if (modalBtnFormatted) {
     modalBtnFormatted.addEventListener("click", () => {
       currentModalViewMode = "formatted";
       modalBtnFormatted.classList.add("active");
+      if (modalBtnExcerpts) modalBtnExcerpts.classList.remove("active");
       if (modalBtnRaw) modalBtnRaw.classList.remove("active");
       if (activeModalDocId !== null) {
         renderModalContent(engine.documents.get(activeModalDocId));
@@ -1331,6 +1521,7 @@ document.addEventListener("DOMContentLoaded", () => {
     modalBtnRaw.addEventListener("click", () => {
       currentModalViewMode = "raw";
       modalBtnRaw.classList.add("active");
+      if (modalBtnExcerpts) modalBtnExcerpts.classList.remove("active");
       if (modalBtnFormatted) modalBtnFormatted.classList.remove("active");
       if (activeModalDocId !== null) {
         renderModalContent(engine.documents.get(activeModalDocId));

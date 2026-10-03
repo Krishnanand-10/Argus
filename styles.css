@@ -2164,3 +2164,54 @@ body {
   flex-direction: column;
   gap: 20px;
 }
+
+/* Match Count Badge & Enhanced BM25 Score Pill */
+.bm25-score-pill {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(0, 210, 255, 0.08);
+  border: 1px solid var(--accent-border);
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: help;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.bm25-score-pill:hover {
+  background: rgba(0, 210, 255, 0.16);
+  border-color: var(--accent);
+}
+
+.match-count-badge {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  padding: 2px 7px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+/* Ultra-vivid Search Term Highlight */
+mark.search-highlight,
+.result-snippet mark,
+.studio-modal-body mark {
+  background: rgba(0, 210, 255, 0.28);
+  color: #ffffff;
+  border-bottom: 2px solid var(--accent);
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  box-shadow: 0 0 8px rgba(0, 210, 255, 0.25);
+}
