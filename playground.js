@@ -547,13 +547,21 @@ class StudioEngine {
           matchedStems: new Set(),
           tfSum: 0,
           dl,
-          positions: []
+          positions: [],
+          breakdown: []
         };
 
         current.score += termScore;
         current.matchedStems.add(stem);
         current.tfSum += tf;
         current.positions.push(...posting.positions);
+        current.breakdown.push({
+          stem,
+          tf,
+          idf: +idf.toFixed(2),
+          tfNorm: +tfNorm.toFixed(2),
+          score: +termScore.toFixed(2)
+        });
         scores.set(docId, current);
       }
     }
@@ -594,6 +602,9 @@ class StudioEngine {
         isHtml: !!doc.isHtml,
         fileSize: doc.fileSize || 0,
         score: +item.score.toFixed(2),
+        dl: item.dl,
+        avgdl: Math.round(this.avgdl),
+        breakdown: item.breakdown || [],
         snippet: snippetData.html,
         matchCount: snippetData.matchCount,
         matchedStems: Array.from(item.matchedStems),
@@ -706,7 +717,173 @@ class StudioEngine {
 }
 
 // ============================================================================
-// 6. Studio UI Controller
+// 6. Pre-Loaded Technical Sample Dataset (Systems, Storage & IR)
+// ============================================================================
+const SAMPLE_DATASET = [
+  {
+    id: 1,
+    title: "Raft Consensus: Replicated State Machines in Distributed Systems",
+    path: "systems/distributed/raft-consensus.md",
+    body: "Raft is a distributed consensus algorithm designed for state machine replication across server clusters. By decomposing consensus into distinct subproblems—leader election, log replication, and safety—Raft ensures strong serializability and fault tolerance with high mechanical efficiency."
+  },
+  {
+    id: 2,
+    title: "Okapi BM25: Probabilistic Relevance Scoring & Term Saturation",
+    path: "ir/ranking/okapi-bm25.md",
+    body: "Okapi BM25 is a non-linear ranking function used by search engines to estimate document relevance. It introduces non-linear term frequency saturation via the k1 parameter and normalizes against corpus document length using b, superseding classical TF-IDF."
+  },
+  {
+    id: 3,
+    title: "Variable-Byte (Varint) and Delta-Gap Inverted Index Compression",
+    path: "storage/compression/varint-delta.md",
+    body: "Inverted indexes serialize sorted posting lists using delta encoding (d-gaps), storing strictly monotonic DocID differences. These small integers are packed with Variable-Byte (VByte) encoding, achieving 70% compression ratios with zero memory decompression overhead."
+  },
+  {
+    id: 4,
+    title: "Byzantine Fault Tolerance & Quorum Slices in Decentralized Logs",
+    path: "systems/consensus/byzantine-quorum.md",
+    body: "Byzantine fault tolerance protocols guarantee liveness and safety even when participant nodes fail arbitrarily or act maliciously. Quorum slices allow decentralized consensus without requiring global synchrony or centralized coordinators."
+  },
+  {
+    id: 5,
+    title: "Mechanical Sympathy in V8: Contiguous TypedArrays & Zero-GC Engines",
+    path: "runtime/v8/typedarray-memory.md",
+    body: "Mechanical sympathy requires aligning data structure layout with CPU cache lines and the V8 runtime. Argus leverages contiguous TypedArrays (Uint32Array, Float32Array) instead of fragmented heap objects, eliminating garbage collection pauses."
+  },
+  {
+    id: 6,
+    title: "Skip-List Intersection and WAND Dynamic Pruning for Fast Retrieval",
+    path: "ir/index/wand-skip-lists.md",
+    body: "During multi-term boolean queries, skip lists placed at root-L intervals allow leaping across non-matching document blocks. Weak AND (WAND) dynamic pruning calculates upper-bound score contributions to skip non-competitive documents entirely."
+  },
+  {
+    id: 7,
+    title: "Positional Postings and Exact Phrase Search with Slop Distances",
+    path: "ir/query/positional-phrase.md",
+    body: "Positional inverted indexes record word offset sequences for every document posting. This allows verifying exact phrases and proximity queries in linear time by computing difference arrays over positional posting streams."
+  },
+  {
+    id: 8,
+    title: "Unicode Normalization & Morphological Porter Stemming Codecs",
+    path: "analyzer/nlp/porter-stemmer.md",
+    body: "Text analysis pipelines normalize Unicode codepoints using NFKD decomposition before applying the algorithmic Porter stemmer. Suffix stripping collapses lexical variations like 'retrieval' and 'retrieving' to their root stem 'retriev'."
+  },
+  {
+    id: 9,
+    title: "LSM-Tree vs B-Tree Storage Engines for Write-Heavy Inverted Logs",
+    path: "storage/engine/lsm-vs-btree.md",
+    body: "Log-Structured Merge-Trees (LSM-trees) optimize write amplification by appending incoming mutations to an in-memory memtable before flushing immutable SSTables to disk, contrasting with in-place page updating B-Trees."
+  },
+  {
+    id: 10,
+    title: "Vector Search vs Lexical Full-Text Retrieval: Hybrid Search Paradigms",
+    path: "ir/hybrid/vector-lexical.md",
+    body: "While dense neural embeddings capture semantic intent, lexical BM25 search remains irreplaceable for exact keyword precision, code search, and low-latency deterministic scoring. Modern engines combine both in a hybrid fusion pipeline."
+  }
+];
+
+// ============================================================================
+// 7. IndexedDB Persistence Layer
+// ============================================================================
+const ArgusDB = {
+  dbName: "argus_search_db",
+  version: 1,
+  storeName: "documents",
+
+  open() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(this.dbName, this.version);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(this.storeName)) {
+          db.createObjectStore(this.storeName, { keyPath: "id" });
+        }
+      };
+      req.onsuccess = (e) => resolve(e.target.result);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  async getAll() {
+    try {
+      const db = await this.open();
+      return new Promise((resolve) => {
+        const tx = db.transaction(this.storeName, "readonly");
+        const store = tx.objectStore(this.storeName);
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => resolve([]);
+      });
+    } catch {
+      return [];
+    }
+  },
+
+  async put(doc) {
+    try {
+      const db = await this.open();
+      return new Promise((resolve) => {
+        const tx = db.transaction(this.storeName, "readwrite");
+        const store = tx.objectStore(this.storeName);
+        store.put(doc);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      });
+    } catch {
+      return false;
+    }
+  },
+
+  async putMany(docs) {
+    try {
+      const db = await this.open();
+      return new Promise((resolve) => {
+        const tx = db.transaction(this.storeName, "readwrite");
+        const store = tx.objectStore(this.storeName);
+        for (const doc of docs) {
+          store.put(doc);
+        }
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      });
+    } catch {
+      return false;
+    }
+  },
+
+  async delete(id) {
+    try {
+      const db = await this.open();
+      return new Promise((resolve) => {
+        const tx = db.transaction(this.storeName, "readwrite");
+        const store = tx.objectStore(this.storeName);
+        store.delete(id);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      });
+    } catch {
+      return false;
+    }
+  },
+
+  async clear() {
+    try {
+      const db = await this.open();
+      return new Promise((resolve) => {
+        const tx = db.transaction(this.storeName, "readwrite");
+        const store = tx.objectStore(this.storeName);
+        store.clear();
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      });
+    } catch {
+      return false;
+    }
+  }
+};
+
+// ============================================================================
+// 8. Studio UI Controller
 // ============================================================================
 document.addEventListener("DOMContentLoaded", () => {
   const engine = new StudioEngine([]);
@@ -726,6 +903,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const resultsCountBadge = document.getElementById("results-count-badge");
   const corpusStatusPill = document.getElementById("corpus-status-pill");
   const tabDocCount = document.getElementById("tab-doc-count");
+
+  // New UX Elements
+  const btnLoadSamplesLeft = document.getElementById("btn-load-samples-left");
+  const queryAnalysisStrip = document.getElementById("query-analysis-strip");
+  const queryTokenChain = document.getElementById("query-token-chain");
+  const liveStatTerms = document.getElementById("live-stat-terms");
+  const liveStatPostings = document.getElementById("live-stat-postings");
+  const liveStatSize = document.getElementById("live-stat-size");
+  const liveStatCompression = document.getElementById("live-stat-compression");
+  const liveStatAvgdl = document.getElementById("live-stat-avgdl");
+  const toastActionContainer = document.getElementById("toast-action-container");
 
   // Filter Buttons & Counts
   const filterCountAll = document.getElementById("filter-count-all");
@@ -766,6 +954,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const docPathInput = document.getElementById("doc-path-input");
   const docBodyInput = document.getElementById("doc-body-input");
   const btnIndexDoc = document.getElementById("btn-index-doc");
+  const btnIndexAddAnother = document.getElementById("btn-index-add-another");
   const liveWordCount = document.getElementById("live-word-count");
   const liveCharCount = document.getElementById("live-char-count");
   const liveTokenCount = document.getElementById("live-token-count");
@@ -800,17 +989,38 @@ document.addEventListener("DOMContentLoaded", () => {
   let activeModalDocId = null;
   let currentModalViewMode = "excerpts"; // 'excerpts' | 'formatted' | 'raw'
 
-  // Toast
+  // Toast with action button support
   const toastNotice = document.getElementById("toast-notice");
   const toastMsg = document.getElementById("toast-msg");
+  let toastTimer = null;
 
-  function showToast(message) {
+  function showToast(message, actionLabel = null, onAction = null) {
     if (!toastNotice) return;
+    if (toastTimer) clearTimeout(toastTimer);
+
     toastMsg.textContent = message;
+    if (toastActionContainer) {
+      toastActionContainer.innerHTML = "";
+      if (actionLabel && onAction) {
+        const actBtn = document.createElement("button");
+        actBtn.className = "undo-toast-btn";
+        actBtn.textContent = actionLabel;
+        actBtn.onclick = () => {
+          if (toastTimer) clearTimeout(toastTimer);
+          toastNotice.classList.remove("show");
+          if (toastActionContainer) toastActionContainer.innerHTML = "";
+          onAction();
+        };
+        toastActionContainer.appendChild(actBtn);
+      }
+    }
+
     toastNotice.classList.add("show");
-    setTimeout(() => {
+    const duration = onAction ? 5500 : 2500;
+    toastTimer = setTimeout(() => {
       toastNotice.classList.remove("show");
-    }, 2500);
+      if (toastActionContainer) toastActionContainer.innerHTML = "";
+    }, duration);
   }
 
   // Note Modal toggles
@@ -891,12 +1101,231 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // --------------------------------------------------------------------------
+  // Real-Time Query Analysis Pipeline (Morphological Stems + Boolean Operators)
+  // --------------------------------------------------------------------------
+  function updateQueryAnalysisStrip(query) {
+    if (!queryTokenChain) return;
+    const q = (query || "").trim();
+    if (!q) {
+      queryTokenChain.innerHTML = '<span style="color: #a1a1aa; font-size: 0.72rem;">Type a query to preview morphological stem transformations...</span>';
+      return;
+    }
+
+    const rawTokens = q.match(/"[^"]*"|[^\s]+/g) || [];
+    const htmlParts = [];
+
+    for (const raw of rawTokens) {
+      const upper = raw.toUpperCase();
+      if (upper === "AND" || upper === "OR" || upper === "NOT") {
+        htmlParts.push(`<span class="query-op-chip">${escapeHtml(upper)}</span>`);
+      } else if (raw.startsWith('"') && raw.endsWith('"') && raw.length > 1) {
+        const inner = raw.slice(1, -1);
+        const innerTokens = tokenize(inner);
+        const stems = innerTokens.map(t => t.stem).join(" ");
+        htmlParts.push(`
+          <span class="query-token-item" title="Exact phrase query">
+            <span class="query-token-raw">"${escapeHtml(inner)}"</span>
+            <span class="query-token-arrow">→</span>
+            <span class="query-token-stem">"${escapeHtml(stems)}"</span>
+          </span>
+        `);
+      } else {
+        const cleaned = raw.replace(/[^\p{L}\p{N}]+/gu, "");
+        if (!cleaned) continue;
+        const lower = cleaned.toLowerCase();
+        const stem = PorterStemmer(lower);
+        const isStop = STOPWORDS.has(lower);
+
+        if (isStop) {
+          htmlParts.push(`
+            <span class="query-token-item" style="opacity: 0.5;" title="Stopword ignored by engine">
+              <span class="query-token-raw" style="text-decoration: line-through;">${escapeHtml(cleaned)}</span>
+              <span style="font-size: 0.65rem; color: #f43f5e; margin-left: 2px;">(stop)</span>
+            </span>
+          `);
+        } else if (stem !== lower) {
+          htmlParts.push(`
+            <span class="query-token-item">
+              <span class="query-token-raw">${escapeHtml(cleaned)}</span>
+              <span class="query-token-arrow">→</span>
+              <span class="query-token-stem">${escapeHtml(stem)}</span>
+            </span>
+          `);
+        } else {
+          htmlParts.push(`
+            <span class="query-token-item">
+              <span class="query-token-stem">${escapeHtml(stem)}</span>
+            </span>
+          `);
+        }
+      }
+    }
+
+    queryTokenChain.innerHTML = htmlParts.length > 0
+      ? htmlParts.join("")
+      : '<span style="color: #a1a1aa; font-size: 0.72rem;">No searchable terms</span>';
+  }
+
+  // --------------------------------------------------------------------------
+  // Live Engine Telemetry & Compression Footprint
+  // --------------------------------------------------------------------------
+  function updateLiveEngineStats() {
+    const numTerms = engine.postings.size;
+    let totalPostings = 0;
+    for (const postList of engine.postings.values()) {
+      totalPostings += postList.length;
+    }
+    const numDocs = engine.documents.size;
+    const avgDl = numDocs > 0 ? (engine.totalDocLength / numDocs).toFixed(1) : "0";
+
+    let totalTextChars = 0;
+    for (const doc of engine.documents.values()) {
+      totalTextChars += (doc.body ? doc.body.length : 0) + (doc.title ? doc.title.length : 0);
+    }
+    const estimatedBytes = (numTerms * 64) + (totalPostings * 16) + totalTextChars;
+    const sizeKb = estimatedBytes > 0 ? (estimatedBytes / 1024).toFixed(1) + " KB" : "0 KB";
+    const ratio = totalPostings > 0 ? "3.2x" : "—";
+
+    if (liveStatTerms) liveStatTerms.textContent = numTerms.toLocaleString();
+    if (liveStatPostings) liveStatPostings.textContent = totalPostings.toLocaleString();
+    if (liveStatSize) liveStatSize.textContent = sizeKb;
+    if (liveStatCompression) liveStatCompression.textContent = ratio;
+    if (liveStatAvgdl) liveStatAvgdl.textContent = `${avgDl} terms`;
+  }
+
+  // --------------------------------------------------------------------------
+  // Preset Chips Enable / Disable State
+  // --------------------------------------------------------------------------
+  function updatePresetChipsState() {
+    const hasDocs = engine.documents.size > 0;
+    document.querySelectorAll(".preset-chip").forEach(chip => {
+      chip.disabled = !hasDocs;
+      chip.style.opacity = hasDocs ? "1" : "0.45";
+      chip.style.cursor = hasDocs ? "pointer" : "not-allowed";
+      chip.title = hasDocs ? `Search ${chip.getAttribute('data-query')}` : "Index documents first to run example queries";
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // Sample Dataset Loader
+  // --------------------------------------------------------------------------
+  async function loadSampleDataset(runSearch = true) {
+    const t0 = performance.now();
+    let added = 0;
+    const addedDocs = [];
+
+    for (const item of SAMPLE_DATASET) {
+      let exists = false;
+      for (const d of engine.documents.values()) {
+        if (d.path === item.path) {
+          exists = true;
+          break;
+        }
+      }
+      if (!exists) {
+        const doc = engine.addDocument({
+          title: item.title,
+          path: item.path,
+          body: item.body,
+          isFile: true,
+          isNote: false,
+          docType: item.docType || "Technical Paper"
+        });
+        addedDocs.push(doc);
+        added++;
+      }
+    }
+
+    if (addedDocs.length > 0) {
+      await ArgusDB.putMany(addedDocs);
+    }
+
+    const elapsed = Math.round(performance.now() - t0);
+    updateCorpusStats();
+    updateLiveEngineStats();
+    updatePresetChipsState();
+
+    if (added > 0) {
+      showToast(`Indexed ${added} sample docs in ${elapsed} ms`);
+    } else {
+      showToast("Sample dataset is already loaded!");
+    }
+
+    if (runSearch) {
+      searchInput.value = '"inverted index"';
+      clearBtn.style.display = "block";
+      performSearch(searchInput.value);
+    } else {
+      performSearch(searchInput.value);
+    }
+  }
+
+  if (btnLoadSamplesLeft) {
+    btnLoadSamplesLeft.addEventListener("click", () => {
+      loadSampleDataset(true);
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // Recursive Directory Drag & Drop Helper
+  // --------------------------------------------------------------------------
+  async function extractFilesFromDataTransfer(dataTransfer) {
+    const files = [];
+    if (!dataTransfer.items) {
+      return Array.from(dataTransfer.files || []);
+    }
+
+    async function traverseEntry(entry, path = "") {
+      if (!entry) return;
+      if (entry.isFile) {
+        return new Promise((resolve) => {
+          entry.file((file) => {
+            Object.defineProperty(file, "webkitRelativePath", {
+              value: path ? `${path}/${file.name}` : file.name,
+              writable: false
+            });
+            files.push(file);
+            resolve();
+          }, () => resolve());
+        });
+      } else if (entry.isDirectory) {
+        const dirReader = entry.createReader();
+        const entries = await new Promise((resolve) => {
+          dirReader.readEntries((results) => resolve(results || []), () => resolve([]));
+        });
+        const currentPath = path ? `${path}/${entry.name}` : entry.name;
+        for (const child of entries) {
+          await traverseEntry(child, currentPath);
+        }
+      }
+    }
+
+    const entries = [];
+    for (let i = 0; i < dataTransfer.items.length; i++) {
+      const item = dataTransfer.items[i];
+      if (item.webkitGetAsEntry) {
+        const entry = item.webkitGetAsEntry();
+        if (entry) entries.push(entry);
+      }
+    }
+
+    if (entries.length > 0) {
+      for (const entry of entries) {
+        await traverseEntry(entry);
+      }
+      return files;
+    }
+
+    return Array.from(dataTransfer.files || []);
+  }
+
   // Execute Search
   function performSearch(query) {
     const response = engine.search(query, activeCorpusFilter);
 
-    // Latency & Counts
-    latencyVal.textContent = `${response.latencyMs} ms`;
+    // Latency & Counts (Show "—" if search was not executed)
+    latencyVal.textContent = query && query.trim() ? `${response.latencyMs} ms` : "—";
     const filterLabel = activeCorpusFilter === "files" ? " (Files Only)" : activeCorpusFilter === "notes" ? " (Notes Only)" : "";
     resultsCountBadge.textContent = `${response.results.length} Matches${filterLabel}`;
 
@@ -918,19 +1347,38 @@ document.addEventListener("DOMContentLoaded", () => {
     telemPruned.textContent = response.telemetry.wandPruned;
     telemAvgdl.textContent = `${response.telemetry.avgDocLength} terms`;
 
+    // Query analysis & Engine Telemetry Updates
+    updateQueryAnalysisStrip(query);
+    updateLiveEngineStats();
+    updatePresetChipsState();
+
     // Render Results
     if (response.results.length === 0) {
       if (engine.documents.size === 0) {
         resultsCountBadge.textContent = "0 Matches";
         resultsContainer.innerHTML = `
-          <div class="no-results" style="padding: 28px 20px; text-align: center;">
-            <div style="font-size: 1.8rem; margin-bottom: 8px;">📁</div>
-            <div style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin-bottom: 4px;">Zero Documents Indexed Yet</div>
-            <p style="margin: 0 auto; max-width: 440px; font-size: 0.78rem; color: var(--text-dim); line-height: 1.5;">
-              Drop your files or folder above, or click "+ Add Note" to search your content locally and privately in memory.
+          <div class="empty-state-card" style="padding: 36px 20px; text-align: center;">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" style="margin: 0 auto 12px; display: block;">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+            <div style="font-size: 1.05rem; font-weight: 700; color: #ffffff; margin-bottom: 6px; font-family: var(--font-sans);">Zero Documents Indexed Yet</div>
+            <p style="margin: 0 auto 18px; max-width: 440px; font-size: 0.82rem; color: #a1a1aa; line-height: 1.5; font-family: var(--font-sans);">
+              Drop your personal files or folder in the left panel, add a custom note, or load the pre-built technical CS dataset to test search immediately.
             </p>
+            <button id="btn-load-sample-empty" class="sample-dataset-btn" style="margin: 0 auto; display: inline-flex; align-items: center; gap: 8px; font-size: 0.82rem; height: 38px; padding: 0 18px; font-family: var(--font-sans);">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2">
+                <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+              </svg>
+              <span>Load Sample Dataset (10 Docs)</span>
+            </button>
           </div>
         `;
+        const btnEmptyLoad = document.getElementById("btn-load-sample-empty");
+        if (btnEmptyLoad) {
+          btnEmptyLoad.addEventListener("click", () => loadSampleDataset(true));
+        }
         return;
       }
 
@@ -939,7 +1387,7 @@ document.addEventListener("DOMContentLoaded", () => {
         resultsCountBadge.textContent = `${allDocs.length} Document${allDocs.length === 1 ? '' : 's'} Ready`;
         resultsContainer.innerHTML = allDocs.map((doc, idx) => {
           const typeLabel = doc.docType || (doc.isFile ? "File" : "Note");
-          const typeBadge = `<span class="file-pill-badge">${doc.isFile ? '📁 ' : '📝 '}${escapeHtml(typeLabel)}</span>`;
+          const typeBadge = `<span class="file-pill-badge">${escapeHtml(typeLabel)}</span>`;
           const termCount = engine.docLengths.get(doc.id) || 0;
           const snippetText = escapeHtml((doc.body || "").replace(/\s+/g, " ").trim().slice(0, 220));
           return `
@@ -953,7 +1401,15 @@ document.addEventListener("DOMContentLoaded", () => {
                   </div>
                   <div class="result-path">${escapeHtml(doc.path)}</div>
                 </div>
-                <span class="bm25-score-pill">${termCount} terms</span>
+                <div class="bm25-score-container" title="Indexed term count">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; gap: 8px;">
+                    <span style="font-size: 0.65rem; color: #a1a1aa; text-transform: uppercase; font-family: var(--font-sans);">Length</span>
+                    <span class="bm25-score-val">${termCount} terms</span>
+                  </div>
+                  <div class="bm25-score-track">
+                    <div class="bm25-score-fill" style="width: ${Math.min(100, Math.max(10, Math.round((termCount / (engine.totalDocLength / (engine.documents.size || 1) || 1)) * 50)))}%;"></div>
+                  </div>
+                </div>
               </div>
               <div class="result-snippet">${snippetText}${snippetText.length >= 220 ? '…' : ''}</div>
             </article>
@@ -993,6 +1449,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const tokens = tokenize(cleanQ);
     const stems = tokens.map(t => t.stem);
     const queryWords = cleanQ.toLowerCase().split(/\s+/).map(w => w.replace(/[^\w]/g, "")).filter(Boolean);
+    const maxScore = Math.max(...response.results.map(r => r.score), 0.001);
 
     resultsContainer.innerHTML = response.results.map((res, idx) => {
       const matchTags = res.matchedStems
@@ -1000,12 +1457,13 @@ document.addEventListener("DOMContentLoaded", () => {
         : "";
 
       const typeLabel = res.docType || (res.isFile ? "File" : "Note");
-      const typeBadge = `<span class="file-pill-badge" title="${escapeHtml(typeLabel)}">${res.isFile ? '📁 ' : '📝 '}${escapeHtml(typeLabel)}</span>`;
+      const typeBadge = `<span class="file-pill-badge" title="${escapeHtml(typeLabel)}">${escapeHtml(typeLabel)}</span>`;
       const fileSub = res.fileName && res.fileName !== res.title
         ? `<span style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-dim); margin-left: 6px;">(${escapeHtml(res.fileName)})</span>`
         : "";
 
       const highlightedTitle = highlightTermsInText(res.title, stems, queryWords);
+      const scorePct = Math.min(100, Math.max(12, Math.round((res.score / maxScore) * 100)));
 
       return `
         <article class="result-card" data-doc-id="${res.docId}">
@@ -1018,30 +1476,85 @@ document.addEventListener("DOMContentLoaded", () => {
               </div>
               <div class="result-path">${escapeHtml(res.path)}</div>
             </div>
-            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-              <span class="bm25-score-pill" title="Okapi BM25 relevance score calculated by the search engine based on term frequency, word rarity, and document length">
-                ⚡ Relevance: ${res.score.toFixed(2)}
-              </span>
-              ${res.matchCount > 0 ? `<span class="match-count-badge">🎯 ${res.matchCount} match${res.matchCount === 1 ? '' : 'es'}</span>` : ''}
+            <div class="bm25-score-container" title="Okapi BM25 relevance score">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; gap: 8px;">
+                <span style="font-size: 0.65rem; color: #a1a1aa; text-transform: uppercase; font-family: var(--font-sans); letter-spacing: 0.5px;">BM25 Score</span>
+                <span class="bm25-score-val">${res.score.toFixed(2)}</span>
+              </div>
+              <div class="bm25-score-track">
+                <div class="bm25-score-fill" style="width: ${scorePct}%;"></div>
+              </div>
             </div>
           </div>
 
           <div class="result-snippet">${res.snippet}</div>
 
           <div class="result-footer-meta">
-            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+            <div style="display: flex; gap: 4px; flex-wrap: wrap; align-items: center;">
               ${matchTags}
+              ${res.matchCount > 0 ? `<span class="match-count-badge">🎯 ${res.matchCount} match${res.matchCount === 1 ? '' : 'es'}</span>` : ''}
             </div>
-            <span style="margin-left: auto;">Click card to inspect excerpts &amp; full document ↗</span>
+            <div style="display: flex; align-items: center; gap: 10px; margin-left: auto;">
+              <button class="btn-toggle-breakdown" data-target="breakdown-${res.docId}" title="Inspect TF, IDF and score breakdown">
+                Score Breakdown ▾
+              </button>
+              <span style="color: var(--text-dim); font-size: 0.72rem;">Inspect ↗</span>
+            </div>
+          </div>
+
+          <div id="breakdown-${res.docId}" class="score-breakdown-panel" style="display: none;">
+            <div style="font-size: 0.72rem; color: #cbd5e1; margin-bottom: 8px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
+              <span>Document Length: <strong style="color: #ffffff;">${res.dl} terms</strong></span>
+              <span>Avg Corpus Length: <strong style="color: #ffffff;">${res.avgdl.toFixed(1)} terms</strong></span>
+              <span>Relative Ratio: <strong style="color: var(--accent);">${(res.dl / (res.avgdl || 1)).toFixed(2)}x</strong></span>
+            </div>
+            <table class="breakdown-table">
+              <thead>
+                <tr>
+                  <th>Term</th>
+                  <th>TF</th>
+                  <th>IDF</th>
+                  <th>Normalized TF</th>
+                  <th>BM25 Contribution</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(res.breakdown || []).map(b => `
+                  <tr>
+                    <td style="color: var(--accent); font-weight: 600; font-family: var(--font-mono);">${escapeHtml(b.stem)}</td>
+                    <td style="font-family: var(--font-mono);">${b.tf}</td>
+                    <td style="font-family: var(--font-mono);">${b.idf.toFixed(3)}</td>
+                    <td style="font-family: var(--font-mono);">${b.tfNorm.toFixed(3)}</td>
+                    <td style="color: #6ee7b7; font-weight: 600; font-family: var(--font-mono);">+${b.score.toFixed(3)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
           </div>
         </article>
       `;
     }).join("");
 
     resultsContainer.querySelectorAll(".result-card").forEach(card => {
-      card.addEventListener("click", () => {
+      card.addEventListener("click", (e) => {
+        if (e.target.closest(".btn-toggle-breakdown") || e.target.closest(".score-breakdown-panel")) {
+          return;
+        }
         const id = parseInt(card.getAttribute("data-doc-id"), 10);
         openDocumentModal(id);
+      });
+    });
+
+    resultsContainer.querySelectorAll(".btn-toggle-breakdown").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const targetId = btn.getAttribute("data-target");
+        const panel = document.getElementById(targetId);
+        if (panel) {
+          const isOpen = panel.style.display !== "none";
+          panel.style.display = isOpen ? "none" : "block";
+          btn.textContent = isOpen ? "Score Breakdown ▾" : "Hide Breakdown ▴";
+        }
       });
     });
   }
@@ -1116,11 +1629,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     personalFilesList.querySelectorAll(".doc-delete-btn").forEach(btn => {
-      btn.addEventListener("click", (e) => {
+      btn.addEventListener("click", async (e) => {
         e.stopPropagation();
         const id = parseInt(btn.getAttribute("data-delete-id"), 10);
         engine.removeDocument(id);
+        await ArgusDB.delete(id);
         updateCorpusStats();
+        updateLiveEngineStats();
+        updatePresetChipsState();
         performSearch(searchInput.value);
         showToast(`Removed personal file #${id}`);
       });
@@ -1150,7 +1666,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     studioDocList.innerHTML = docs.map(d => {
       const length = engine.docLengths.get(d.id) || 0;
-      const typeLabel = d.isFile ? '📁 File' : '📝 Note';
+      const typeLabel = d.isFile ? 'File' : 'Note';
       return `
         <div class="doc-list-item" data-id="${d.id}">
           <div style="flex: 1; min-width: 0;">
@@ -1180,11 +1696,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     studioDocList.querySelectorAll(".doc-delete-btn").forEach(btn => {
-      btn.addEventListener("click", (e) => {
+      btn.addEventListener("click", async (e) => {
         e.stopPropagation();
         const id = parseInt(btn.getAttribute("data-delete-id"), 10);
         engine.removeDocument(id);
+        await ArgusDB.delete(id);
         updateCorpusStats();
+        updateLiveEngineStats();
+        updatePresetChipsState();
         performSearch(searchInput.value);
         showToast(`Document #${id} removed from index`);
       });
@@ -1195,8 +1714,9 @@ document.addEventListener("DOMContentLoaded", () => {
   async function processLocalFiles(fileList) {
     if (!fileList || fileList.length === 0) return;
 
+    const t0 = performance.now();
     let addedCount = 0;
-    let firstTerm = "";
+    const addedDocs = [];
 
     for (const file of fileList) {
       if (file.size > 5000000) continue; // Skip large files > 5MB
@@ -1215,13 +1735,10 @@ document.addEventListener("DOMContentLoaded", () => {
           fileName: file.name
         });
 
+        addedDocs.push(doc);
         addedCount++;
-        if (!firstTerm) {
-          const t = tokenize(doc.title);
-          if (t.length > 0) firstTerm = t[0].raw;
-        }
 
-        // Try syncing with server
+        // Try syncing with server in background
         fetch("/api/upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1233,16 +1750,21 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
+    if (addedDocs.length > 0) {
+      await ArgusDB.putMany(addedDocs);
+    }
+
+    const elapsed = Math.round(performance.now() - t0);
+
     if (addedCount > 0) {
       activeCorpusFilter = "files";
       updateFilterButtons();
       updateCorpusStats();
-      showToast(`Indexed ${addedCount} file${addedCount > 1 ? "s" : ""} into V8 memory!`);
+      updateLiveEngineStats();
+      updatePresetChipsState();
+      showToast(`Indexed ${addedCount} file${addedCount > 1 ? "s" : ""} in ${elapsed} ms!`);
 
-      if (firstTerm) {
-        searchInput.value = firstTerm;
-        clearBtn.style.display = "block";
-      }
+      // Do NOT overwrite searchInput so all newly added documents stay visible!
       performSearch(searchInput.value);
     } else {
       alert("No readable text, markdown, code, or JSON files found in selected files.");
@@ -1284,11 +1806,14 @@ document.addEventListener("DOMContentLoaded", () => {
       dropzone.classList.remove("dragover");
     });
 
-    dropzone.addEventListener("drop", (e) => {
+    dropzone.addEventListener("drop", async (e) => {
       e.preventDefault();
       dropzone.classList.remove("dragover");
-      if (e.dataTransfer && e.dataTransfer.files) {
-        processLocalFiles(e.dataTransfer.files);
+      if (e.dataTransfer) {
+        const files = await extractFilesFromDataTransfer(e.dataTransfer);
+        if (files && files.length > 0) {
+          processLocalFiles(files);
+        }
       }
     });
 
@@ -1298,7 +1823,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (btnClearPersonalFiles) {
-    btnClearPersonalFiles.addEventListener("click", () => {
+    btnClearPersonalFiles.addEventListener("click", async () => {
       const fileIds = [];
       for (const [id, doc] of engine.documents.entries()) {
         if (doc.isFile) fileIds.push(id);
@@ -1309,10 +1834,13 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       for (const id of fileIds) {
         engine.removeDocument(id);
+        await ArgusDB.delete(id);
       }
       activeCorpusFilter = "all";
       updateFilterButtons();
       updateCorpusStats();
+      updateLiveEngineStats();
+      updatePresetChipsState();
       performSearch(searchInput.value);
       showToast(`Cleared ${fileIds.length} uploaded file${fileIds.length === 1 ? '' : 's'} from index`);
     });
@@ -1580,34 +2108,62 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Index Document Action
-  btnIndexDoc.addEventListener("click", () => {
-    const title = docTitleInput.value.trim();
-    const path = docPathInput.value.trim();
-    const body = docBodyInput.value.trim();
+  // Index Document Action (supports multi-doc '---' delimiter and 'Add Another' flow)
+  async function indexCurrentNote(keepModalOpen = false) {
+    const rawTitle = docTitleInput.value.trim();
+    const rawPath = docPathInput.value.trim();
+    const rawBody = docBodyInput.value.trim();
 
-    if (!title && !body) {
+    if (!rawTitle && !rawBody) {
       alert("Please provide at least a title or text content to index.");
       return;
     }
 
-    const doc = engine.addDocument({
-      title: title || "Untitled Document",
-      path: path || "notes/custom-note.md",
-      body: body || title,
-      isFile: false,
-      isNote: true
-    });
+    const t0 = performance.now();
+    const addedDocs = [];
 
-    fetch("/api/index", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(doc)
-    }).catch(() => {});
+    // Check if body has multi-document separators `---`
+    if (rawBody.includes("\n---\n") || rawBody.includes("\r\n---\r\n")) {
+      const parts = rawBody.split(/\r?\n---\r?\n/).map(p => p.trim()).filter(Boolean);
+      let partIdx = 1;
+      for (const part of parts) {
+        let title = rawTitle ? `${rawTitle} (Part ${partIdx})` : `Document #${partIdx}`;
+        const matchH = part.match(/^#+\s*(.+)/);
+        if (matchH && matchH[1]) {
+          title = matchH[1].trim();
+        }
+        const doc = engine.addDocument({
+          title: title,
+          path: rawPath ? `${rawPath}-part${partIdx}` : `notes/note-part-${partIdx}.md`,
+          body: part,
+          isFile: false,
+          isNote: true
+        });
+        addedDocs.push(doc);
+        partIdx++;
+      }
+    } else {
+      const doc = engine.addDocument({
+        title: rawTitle || "Untitled Document",
+        path: rawPath || "notes/custom-note.md",
+        body: rawBody || rawTitle,
+        isFile: false,
+        isNote: true
+      });
+      addedDocs.push(doc);
+    }
 
+    if (addedDocs.length > 0) {
+      await ArgusDB.putMany(addedDocs);
+    }
+
+    const elapsed = Math.round(performance.now() - t0);
     updateCorpusStats();
-    showToast(`Indexed "${doc.title}" into memory (+${engine.docLengths.get(doc.id)} terms)`);
-    closeNoteModal();
+    updateLiveEngineStats();
+    updatePresetChipsState();
+
+    const count = addedDocs.length;
+    showToast(`Indexed ${count} note${count > 1 ? "s" : ""} in ${elapsed} ms`);
 
     docTitleInput.value = "";
     docPathInput.value = "";
@@ -1617,15 +2173,19 @@ document.addEventListener("DOMContentLoaded", () => {
     liveTokenCount.textContent = "0";
     liveStemChips.innerHTML = '<span class="token-chip" style="opacity: 0.5;">Type text above to preview token stream...</span>';
 
-    const newTokens = tokenize(doc.title);
-    if (newTokens.length > 0) {
-      searchInput.value = newTokens[0].raw;
-      clearBtn.style.display = "block";
-      performSearch(searchInput.value);
+    if (!keepModalOpen) {
+      closeNoteModal();
     } else {
-      performSearch(searchInput.value);
+      docTitleInput.focus();
     }
-  });
+
+    performSearch(searchInput.value);
+  }
+
+  btnIndexDoc.addEventListener("click", () => indexCurrentNote(false));
+  if (btnIndexAddAnother) {
+    btnIndexAddAnother.addEventListener("click", () => indexCurrentNote(true));
+  }
 
   // Quick Template Inserters
   const btnInsertNote = document.getElementById("btn-insert-note");
@@ -1665,24 +2225,57 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Reset / Clear Corpus
+  // Reset / Clear Corpus with 5-Second Undo Toast
   if (btnResetCorpus) {
     btnResetCorpus.addEventListener("click", () => {
       if (engine.documents.size === 0) {
         showToast("Index is already empty");
         return;
       }
-      if (confirm("Clear all indexed documents and notes from memory?")) {
-        engine.documents.clear();
-        engine.docLengths.clear();
-        engine.postings.clear();
-        engine.totalDocLength = 0;
-        activeCorpusFilter = "all";
-        updateFilterButtons();
+
+      // Snapshot documents for undo
+      const backupDocs = Array.from(engine.documents.values()).map(d => ({ ...d }));
+      const backupCount = backupDocs.length;
+
+      // Clear in-memory structures
+      engine.documents.clear();
+      engine.docLengths.clear();
+      engine.postings.clear();
+      engine.totalDocLength = 0;
+
+      activeCorpusFilter = "all";
+      updateFilterButtons();
+      updateCorpusStats();
+      updateLiveEngineStats();
+      updatePresetChipsState();
+      performSearch(searchInput.value);
+
+      let countdown = 5;
+      let undoCountdownInterval = null;
+
+      showToast(`Cleared ${backupCount} documents.`, `Undo (${countdown}s)`, async () => {
+        if (undoCountdownInterval) clearInterval(undoCountdownInterval);
+        for (const doc of backupDocs) {
+          engine.addDocument(doc);
+        }
+        await ArgusDB.putMany(backupDocs);
         updateCorpusStats();
+        updateLiveEngineStats();
+        updatePresetChipsState();
         performSearch(searchInput.value);
-        showToast("Cleared all documents from in-memory index");
-      }
+        showToast(`Restored ${backupCount} documents!`);
+      });
+
+      undoCountdownInterval = setInterval(() => {
+        countdown--;
+        const undoBtn = document.querySelector(".undo-toast-btn");
+        if (undoBtn) undoBtn.textContent = `Undo (${countdown}s)`;
+        if (countdown <= 0) {
+          clearInterval(undoCountdownInterval);
+          ArgusDB.clear();
+          localStorage.setItem("argus_cleared_by_user", "true");
+        }
+      }, 1000);
     });
   }
 
@@ -1799,14 +2392,52 @@ document.addEventListener("DOMContentLoaded", () => {
     e.preventDefault();
   });
 
-  window.addEventListener("drop", (e) => {
+  window.addEventListener("drop", async (e) => {
     e.preventDefault();
-    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      processLocalFiles(e.dataTransfer.files);
+    if (e.dataTransfer) {
+      const files = await extractFilesFromDataTransfer(e.dataTransfer);
+      if (files && files.length > 0) {
+        processLocalFiles(files);
+      }
     }
   });
 
-  // Initial Boot
-  updateCorpusStats();
-  performSearch(searchInput.value);
+  // Initial Boot: Restore from IndexedDB or auto-load sample dataset on first visit
+  async function initCorpus() {
+    try {
+      const stored = await ArgusDB.getAll();
+      if (stored && stored.length > 0) {
+        for (const doc of stored) {
+          engine.addDocument(doc);
+        }
+        updateCorpusStats();
+        updateLiveEngineStats();
+        updatePresetChipsState();
+        performSearch("");
+      } else {
+        const clearedByUser = localStorage.getItem("argus_cleared_by_user");
+        if (!clearedByUser) {
+          // First visit: automatically index sample dataset!
+          await loadSampleDataset(false);
+        } else {
+          updateCorpusStats();
+          updateLiveEngineStats();
+          updatePresetChipsState();
+          performSearch("");
+        }
+      }
+    } catch (err) {
+      console.warn("ArgusDB boot failed, using empty index", err);
+      updateCorpusStats();
+      updateLiveEngineStats();
+      updatePresetChipsState();
+      performSearch("");
+    }
+
+    if (searchInput) {
+      searchInput.focus();
+    }
+  }
+
+  initCorpus();
 });

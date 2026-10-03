@@ -48,20 +48,18 @@
       </div>
 
       <div class="header-right">
-        <button id="btn-header-note" class="btn-studio-action" style="width: auto; height: 32px; padding: 0 12px; margin: 0; font-size: 0.74rem;">
-          <span>+ Add Note</span>
-        </button>
-
-        <button id="btn-header-upload" class="btn-studio-secondary" style="height: 32px; padding: 0 12px; font-size: 0.74rem;">
-          <span>📁 Upload Files</span>
-        </button>
-
         <button id="btn-toggle-internals" class="btn-studio-secondary" style="height: 32px; padding: 0 12px; font-size: 0.74rem;" title="View BM25 Tuning, AST Query Plan &amp; Telemetry">
-          <span>⚡ Internals</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+          <span>Internals</span>
         </button>
 
-        <a href="index.html" class="btn-studio-secondary" style="text-decoration: none; height: 32px; display: inline-flex; align-items: center;">
-          <span>↖ Overview</span>
+        <a href="index.html" class="btn-studio-secondary" style="text-decoration: none; height: 32px; display: inline-flex; align-items: center; gap: 6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+          <span>Overview</span>
         </a>
 
         <a href="https://www.npmjs.com/package/argus-search" target="_blank" rel="noopener noreferrer" class="btn-header-icon btn-npm" title="View on npm: argus-search">
@@ -86,7 +84,9 @@
     <aside class="clean-split-left">
       <div class="split-pane-header">
         <div class="split-pane-title">
-          <span>📁</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          </svg>
           <span>Document Ingestion</span>
         </div>
         <span id="corpus-status-pill" class="pane-badge">0 DOCS INDEXED</span>
@@ -94,39 +94,63 @@
 
       <!-- Dropzone for Local Files / Folders -->
       <div id="studio-dropzone" class="clean-dropzone-box" title="Drop files or folder to index in browser memory">
-        <div style="font-size: 1.5rem; margin-bottom: 4px; color: var(--accent);">📁</div>
-        <div style="font-size: 0.82rem; font-weight: 600; color: #ffffff; margin-bottom: 2px;">Drop files or folder here</div>
-        <div style="font-size: 0.68rem; color: var(--text-dim); margin-bottom: 10px; line-height: 1.4;">
-          Supports .txt, .md, .json, .csv, code &amp; text files
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 6px;">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          <line x1="12" y1="11" x2="12" y2="17"/>
+          <polyline points="9 14 12 11 15 14"/>
+        </svg>
+        <div style="font-size: 0.84rem; font-weight: 600; color: #ffffff; margin-bottom: 2px;">Drop files or folder here</div>
+        <div style="font-size: 0.72rem; color: #a1a1aa; margin-bottom: 12px; line-height: 1.4;">
+          Supports text, Markdown, codebases, JSON &amp; CSV
         </div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; width: 100%;">
-          <button id="btn-browse-files" class="btn-studio-action" style="flex: 1; min-width: 110px; height: 32px; font-size: 0.72rem; margin: 0; padding: 0 8px;">
-            📄 Choose Files...
+          <button id="btn-browse-files" class="btn-studio-action" style="flex: 1; min-width: 110px; height: 32px; font-size: 0.74rem; margin: 0; padding: 0 10px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <span>Choose Files...</span>
           </button>
-          <button id="btn-browse-folder" class="btn-studio-secondary" style="flex: 1; min-width: 110px; height: 32px; font-size: 0.72rem; padding: 0 8px;">
-            📁 Choose Folder...
+          <button id="btn-browse-folder" class="btn-studio-secondary" style="flex: 1; min-width: 110px; height: 32px; font-size: 0.74rem; padding: 0 10px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span>Choose Folder...</span>
           </button>
         </div>
-        <input type="file" id="local-file-input" multiple style="display: none;" accept=".txt,.md,.markdown,.json,.csv,.js,.ts,.tsx,.jsx,.py,.html,.css,.scss,.yml,.yaml,.sh,.sql,.log,.xml,.env">
+
+        <button id="btn-load-samples-left" class="sample-dataset-btn" style="width: 100%; height: 32px; font-size: 0.74rem; justify-content: center; margin-top: 8px;" title="Load 10 pre-built technical CS &amp; systems papers">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2">
+            <ellipse cx="12" cy="5" rx="9" ry="3"/>
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+          </svg>
+          <span>Load Sample Dataset (10 Docs)</span>
+        </button>
+
+        <input type="file" id="local-file-input" multiple style="display: none;">
         <input type="file" id="local-folder-input" webkitdirectory directory multiple style="display: none;">
       </div>
 
       <!-- Quick Action: Write Note -->
-      <button id="btn-left-add-note" class="btn-studio-secondary" style="width: 100%; height: 32px; font-size: 0.72rem; display: flex; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0;">
-        <span>✍️</span>
+      <button id="btn-left-add-note" class="btn-studio-secondary" style="width: 100%; height: 34px; font-size: 0.76rem; display: flex; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
         <span>+ Write New Text Note</span>
       </button>
 
       <!-- Indexed Documents Header & Clear Controls -->
       <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px; flex-shrink: 0;">
         <div class="split-pane-subtitle">
-          Indexed Documents (<span id="tab-doc-count" style="color: var(--accent);">0</span>)
+          Indexed Documents (<span id="tab-doc-count" style="color: var(--accent); font-family: var(--font-mono);">0</span>)
         </div>
         <div style="display: flex; gap: 6px;">
-          <button id="btn-clear-personal-files" class="btn-studio-secondary" style="font-size: 0.64rem; padding: 2px 6px; color: #f43f5e;" title="Remove uploaded files">
+          <button id="btn-clear-personal-files" class="btn-studio-secondary" style="font-size: 0.68rem; padding: 2px 7px; color: #f43f5e;" title="Remove uploaded files">
             Clear Files
           </button>
-          <button id="btn-reset-corpus" class="btn-studio-secondary" style="font-size: 0.64rem; padding: 2px 6px; color: #f43f5e;" title="Clear all documents &amp; notes">
+          <button id="btn-reset-corpus" class="btn-studio-secondary" style="font-size: 0.68rem; padding: 2px 7px; color: #f43f5e;" title="Clear all documents &amp; notes">
             Clear All
           </button>
         </div>
@@ -139,9 +163,9 @@
           type="text" 
           class="studio-input" 
           placeholder="Filter documents by name or path..." 
-          style="height: 30px; font-size: 0.72rem; padding-left: 28px;"
+          style="height: 32px; font-size: 0.76rem; padding-left: 30px; font-family: var(--font-sans);"
         >
-        <svg style="position: absolute; left: 8px; top: 8px; opacity: 0.4;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg style="position: absolute; left: 9px; top: 9px; color: #a1a1aa;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/>
           <line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
@@ -159,12 +183,14 @@
         <div id="studio-status-bar"></div>
         <button id="btn-status-upload"></button>
         <button id="btn-status-note"></button>
+        <button id="btn-header-note"></button>
+        <button id="btn-header-upload"></button>
         <span id="filter-count-personal">0</span>
         <div id="personal-files-list"></div>
       </div>
     </aside>
 
-    <!-- Right Column: Hero Search & Ranked BM25 Results Feed -->
+    <!-- Right Column: Hero Search, Analysis Strip & Ranked BM25 Results Feed -->
     <section class="clean-split-right">
       <!-- Search Input Hero Card -->
       <div class="clean-search-card">
@@ -182,28 +208,124 @@
             value=""
             autocomplete="off"
             spellcheck="false"
+            autofocus
           >
+          <kbd class="search-kbd" title="Press / anywhere to focus search">/</kbd>
           <button id="clear-search-btn" class="clear-search-btn" title="Clear query" style="display: none;">✕</button>
           <div class="clean-search-latency" title="Search execution latency">
-            <span>Latency:</span> <strong id="latency-val">0.00 ms</strong>
+            <span>Latency:</span> <strong id="latency-val">—</strong>
           </div>
+        </div>
+      </div>
+
+      <!-- Query Analysis Strip (Directly Under Search Bar) -->
+      <div id="query-analysis-strip" class="query-analysis-strip">
+        <span class="query-analysis-label">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2">
+            <polyline points="4 17 10 11 4 5"/>
+            <line x1="12" y1="19" x2="20" y2="19"/>
+          </svg>
+          Query Pipeline:
+        </span>
+        <div id="query-token-chain" class="query-token-chain">
+          <span style="color: #a1a1aa; font-size: 0.72rem;">Type a query to preview morphological stem transformations...</span>
         </div>
       </div>
 
       <!-- Filter Pills & Presets Bar -->
       <div class="clean-filter-bar">
         <div class="clean-filter-pills">
-          <button class="clean-filter-pill corpus-filter-btn active" data-filter="all">All Documents (<span id="filter-count-all">0</span>)</button>
-          <button class="clean-filter-pill corpus-filter-btn" data-filter="files">📁 Files (<span id="filter-count-files">0</span>)</button>
-          <button class="clean-filter-pill corpus-filter-btn" data-filter="notes">📝 Notes (<span id="filter-count-notes">0</span>)</button>
+          <button class="clean-filter-pill corpus-filter-btn active" data-filter="all">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <span>All Documents (<span id="filter-count-all">0</span>)</span>
+          </button>
+          <button class="clean-filter-pill corpus-filter-btn" data-filter="files">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span>Files (<span id="filter-count-files">0</span>)</span>
+          </button>
+          <button class="clean-filter-pill corpus-filter-btn" data-filter="notes">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            <span>Notes (<span id="filter-count-notes">0</span>)</span>
+          </button>
         </div>
 
         <div class="clean-presets-row">
           <span class="clean-presets-label">Examples:</span>
-          <button class="preset-chip" data-query="error OR warning">error OR warning</button>
-          <button class="preset-chip" data-query="react AND typescript">react AND typescript</button>
-          <button class="preset-chip" data-query="&quot;function main&quot;">"function main"</button>
-          <button class="preset-chip" data-query="database">database</button>
+          <button class="preset-chip" data-query="&quot;inverted index&quot;">"inverted index"</button>
+          <button class="preset-chip" data-query="compression NOT video">compression NOT video</button>
+          <button class="preset-chip" data-query="bm25 AND ranking">bm25 AND ranking</button>
+          <button class="preset-chip" data-query="distributed consensus">distributed consensus</button>
+          <button class="preset-chip" data-query="v8 typedarray">v8 typedarray</button>
+        </div>
+      </div>
+
+      <!-- Live Engine Stats Strip (Visible Telemetry) -->
+      <div id="live-engine-stats" class="live-engine-stats">
+        <div class="live-stat-card">
+          <span class="live-stat-label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="2" y1="12" x2="22" y2="12"/>
+            </svg>
+            Unique Terms
+          </span>
+          <span id="live-stat-terms" class="live-stat-value accent">0</span>
+        </div>
+        <div class="live-stat-card">
+          <span class="live-stat-label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="8" y1="6" x2="21" y2="6"/>
+              <line x1="8" y1="12" x2="21" y2="12"/>
+              <line x1="8" y1="18" x2="21" y2="18"/>
+              <line x1="3" y1="6" x2="3.01" y2="6"/>
+              <line x1="3" y1="12" x2="3.01" y2="12"/>
+              <line x1="3" y1="18" x2="3.01" y2="18"/>
+            </svg>
+            Total Postings
+          </span>
+          <span id="live-stat-postings" class="live-stat-value">0</span>
+        </div>
+        <div class="live-stat-card">
+          <span class="live-stat-label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+              <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+              <line x1="6" y1="6" x2="6.01" y2="6"/>
+              <line x1="6" y1="18" x2="6.01" y2="18"/>
+            </svg>
+            Memory Footprint
+          </span>
+          <span id="live-stat-size" class="live-stat-value">0 KB</span>
+        </div>
+        <div class="live-stat-card">
+          <span class="live-stat-label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="4 14 10 14 10 20"/>
+              <polyline points="20 10 14 10 14 4"/>
+              <line x1="14" y1="10" x2="21" y2="3"/>
+              <line x1="3" y1="21" x2="10" y2="14"/>
+            </svg>
+            VByte D-Gap Ratio
+          </span>
+          <span id="live-stat-compression" class="live-stat-value accent">3.2x</span>
+        </div>
+        <div class="live-stat-card">
+          <span class="live-stat-label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+            Avg Doc Length
+          </span>
+          <span id="live-stat-avgdl" class="live-stat-value">0 terms</span>
         </div>
       </div>
 
@@ -379,6 +501,9 @@
             <span>Chars: <span id="live-char-count">0</span></span>
             <span>Est. Tokens: <span id="live-token-count">0</span></span>
           </div>
+          <div style="font-size: 0.68rem; color: var(--text-dim); margin-top: 6px;">
+            💡 <strong>Multi-document tip:</strong> Separate documents with <code>---</code> on a new line to index multiple documents at once!
+          </div>
         </div>
 
         <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
@@ -389,8 +514,11 @@
 
         <div style="display: none;" id="live-stem-chips"></div>
 
-        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <div style="display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap;">
           <button id="note-modal-cancel-btn" class="btn-studio-secondary" style="height: 38px; padding: 0 16px;">Cancel</button>
+          <button id="btn-index-add-another" class="btn-studio-secondary" style="height: 38px; padding: 0 16px; color: var(--accent); border-color: var(--accent-border);" title="Index this document and keep form open to add another">
+            ⚡ Index &amp; Add Another
+          </button>
           <button id="btn-index-doc" class="btn-studio-action" style="width: auto; height: 38px; padding: 0 18px; margin: 0;">
             ⚡ Index into Memory
           </button>
@@ -423,12 +551,13 @@
     </div>
   </div>
 
-  <!-- Global Toast Notice -->
+  <!-- Global Toast Notice with Undo Support -->
   <div id="toast-notice" class="toast-notice">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5">
+    <svg id="toast-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5">
       <polyline points="20 6 9 17 4 12"/>
     </svg>
     <span id="toast-msg">Document indexed successfully!</span>
+    <div id="toast-action-container"></div>
   </div>
 
   <!-- Interactive Studio Logic -->
