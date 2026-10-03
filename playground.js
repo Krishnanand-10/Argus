@@ -717,70 +717,20 @@ class StudioEngine {
 }
 
 // ============================================================================
-// 6. Pre-Loaded Technical Sample Dataset (Systems, Storage & IR)
+// 6. Known Sample Document Paths (for cleansing sample data from index)
 // ============================================================================
-const SAMPLE_DATASET = [
-  {
-    id: 1,
-    title: "Raft Consensus: Replicated State Machines in Distributed Systems",
-    path: "systems/distributed/raft-consensus.md",
-    body: "Raft is a distributed consensus algorithm designed for state machine replication across server clusters. By decomposing consensus into distinct subproblems—leader election, log replication, and safety—Raft ensures strong serializability and fault tolerance with high mechanical efficiency."
-  },
-  {
-    id: 2,
-    title: "Okapi BM25: Probabilistic Relevance Scoring & Term Saturation",
-    path: "ir/ranking/okapi-bm25.md",
-    body: "Okapi BM25 is a non-linear ranking function used by search engines to estimate document relevance. It introduces non-linear term frequency saturation via the k1 parameter and normalizes against corpus document length using b, superseding classical TF-IDF."
-  },
-  {
-    id: 3,
-    title: "Variable-Byte (Varint) and Delta-Gap Inverted Index Compression",
-    path: "storage/compression/varint-delta.md",
-    body: "Inverted indexes serialize sorted posting lists using delta encoding (d-gaps), storing strictly monotonic DocID differences. These small integers are packed with Variable-Byte (VByte) encoding, achieving 70% compression ratios with zero memory decompression overhead."
-  },
-  {
-    id: 4,
-    title: "Byzantine Fault Tolerance & Quorum Slices in Decentralized Logs",
-    path: "systems/consensus/byzantine-quorum.md",
-    body: "Byzantine fault tolerance protocols guarantee liveness and safety even when participant nodes fail arbitrarily or act maliciously. Quorum slices allow decentralized consensus without requiring global synchrony or centralized coordinators."
-  },
-  {
-    id: 5,
-    title: "Mechanical Sympathy in V8: Contiguous TypedArrays & Zero-GC Engines",
-    path: "runtime/v8/typedarray-memory.md",
-    body: "Mechanical sympathy requires aligning data structure layout with CPU cache lines and the V8 runtime. Argus leverages contiguous TypedArrays (Uint32Array, Float32Array) instead of fragmented heap objects, eliminating garbage collection pauses."
-  },
-  {
-    id: 6,
-    title: "Skip-List Intersection and WAND Dynamic Pruning for Fast Retrieval",
-    path: "ir/index/wand-skip-lists.md",
-    body: "During multi-term boolean queries, skip lists placed at root-L intervals allow leaping across non-matching document blocks. Weak AND (WAND) dynamic pruning calculates upper-bound score contributions to skip non-competitive documents entirely."
-  },
-  {
-    id: 7,
-    title: "Positional Postings and Exact Phrase Search with Slop Distances",
-    path: "ir/query/positional-phrase.md",
-    body: "Positional inverted indexes record word offset sequences for every document posting. This allows verifying exact phrases and proximity queries in linear time by computing difference arrays over positional posting streams."
-  },
-  {
-    id: 8,
-    title: "Unicode Normalization & Morphological Porter Stemming Codecs",
-    path: "analyzer/nlp/porter-stemmer.md",
-    body: "Text analysis pipelines normalize Unicode codepoints using NFKD decomposition before applying the algorithmic Porter stemmer. Suffix stripping collapses lexical variations like 'retrieval' and 'retrieving' to their root stem 'retriev'."
-  },
-  {
-    id: 9,
-    title: "LSM-Tree vs B-Tree Storage Engines for Write-Heavy Inverted Logs",
-    path: "storage/engine/lsm-vs-btree.md",
-    body: "Log-Structured Merge-Trees (LSM-trees) optimize write amplification by appending incoming mutations to an in-memory memtable before flushing immutable SSTables to disk, contrasting with in-place page updating B-Trees."
-  },
-  {
-    id: 10,
-    title: "Vector Search vs Lexical Full-Text Retrieval: Hybrid Search Paradigms",
-    path: "ir/hybrid/vector-lexical.md",
-    body: "While dense neural embeddings capture semantic intent, lexical BM25 search remains irreplaceable for exact keyword precision, code search, and low-latency deterministic scoring. Modern engines combine both in a hybrid fusion pipeline."
-  }
-];
+const SAMPLE_PATHS = new Set([
+  "systems/distributed/raft-consensus.md",
+  "ir/ranking/okapi-bm25.md",
+  "storage/compression/varint-delta.md",
+  "systems/consensus/byzantine-quorum.md",
+  "runtime/v8/typedarray-memory.md",
+  "ir/index/wand-skip-lists.md",
+  "ir/query/positional-phrase.md",
+  "analyzer/nlp/porter-stemmer.md",
+  "storage/engine/lsm-vs-btree.md",
+  "ir/hybrid/vector-lexical.md"
+]);
 
 // ============================================================================
 // 7. IndexedDB Persistence Layer
@@ -1207,65 +1157,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // --------------------------------------------------------------------------
-  // Sample Dataset Loader
-  // --------------------------------------------------------------------------
-  async function loadSampleDataset(runSearch = true) {
-    const t0 = performance.now();
-    let added = 0;
-    const addedDocs = [];
 
-    for (const item of SAMPLE_DATASET) {
-      let exists = false;
-      for (const d of engine.documents.values()) {
-        if (d.path === item.path) {
-          exists = true;
-          break;
-        }
-      }
-      if (!exists) {
-        const doc = engine.addDocument({
-          title: item.title,
-          path: item.path,
-          body: item.body,
-          isFile: true,
-          isNote: false,
-          docType: item.docType || "Technical Paper"
-        });
-        addedDocs.push(doc);
-        added++;
-      }
-    }
-
-    if (addedDocs.length > 0) {
-      await ArgusDB.putMany(addedDocs);
-    }
-
-    const elapsed = Math.round(performance.now() - t0);
-    updateCorpusStats();
-    updateLiveEngineStats();
-    updatePresetChipsState();
-
-    if (added > 0) {
-      showToast(`Indexed ${added} sample docs in ${elapsed} ms`);
-    } else {
-      showToast("Sample dataset is already loaded!");
-    }
-
-    if (runSearch) {
-      searchInput.value = '"inverted index"';
-      clearBtn.style.display = "block";
-      performSearch(searchInput.value);
-    } else {
-      performSearch(searchInput.value);
-    }
-  }
-
-  if (btnLoadSamplesLeft) {
-    btnLoadSamplesLeft.addEventListener("click", () => {
-      loadSampleDataset(true);
-    });
-  }
 
   // --------------------------------------------------------------------------
   // Recursive Directory Drag & Drop Helper
@@ -1363,21 +1255,33 @@ document.addEventListener("DOMContentLoaded", () => {
             </svg>
             <div style="font-size: 1.05rem; font-weight: 700; color: #ffffff; margin-bottom: 6px; font-family: var(--font-sans);">Zero Documents Indexed Yet</div>
             <p style="margin: 0 auto 18px; max-width: 440px; font-size: 0.82rem; color: #a1a1aa; line-height: 1.5; font-family: var(--font-sans);">
-              Drop your personal files or folder in the left panel, add a custom note, or load the pre-built technical CS dataset to test search immediately.
+              Drop your personal files or folder in the left panel, or click "+ Write New Text Note" to start searching privately in browser memory.
             </p>
-            <button id="btn-load-sample-empty" class="sample-dataset-btn" style="margin: 0 auto; display: inline-flex; align-items: center; gap: 8px; font-size: 0.82rem; height: 38px; padding: 0 18px; font-family: var(--font-sans);">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2">
-                <ellipse cx="12" cy="5" rx="9" ry="3"/>
-                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-              </svg>
-              <span>Load Sample Dataset (10 Docs)</span>
-            </button>
+            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+              <button id="btn-empty-choose-files" class="btn-studio-action" style="height: 36px; padding: 0 16px; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                <span>Choose Files...</span>
+              </button>
+              <button id="btn-empty-add-note" class="btn-studio-secondary" style="height: 36px; padding: 0 16px; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+                <span>+ Write Text Note</span>
+              </button>
+            </div>
           </div>
         `;
-        const btnEmptyLoad = document.getElementById("btn-load-sample-empty");
-        if (btnEmptyLoad) {
-          btnEmptyLoad.addEventListener("click", () => loadSampleDataset(true));
+        const btnEmptyFiles = document.getElementById("btn-empty-choose-files");
+        if (btnEmptyFiles && localFileInput) {
+          btnEmptyFiles.addEventListener("click", () => localFileInput.click());
+        }
+        const btnEmptyNote = document.getElementById("btn-empty-add-note");
+        if (btnEmptyNote) {
+          btnEmptyNote.addEventListener("click", openNoteModal);
         }
         return;
       }
@@ -2402,37 +2306,28 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Initial Boot: Restore from IndexedDB or auto-load sample dataset on first visit
+  // Initial Boot: Cleanse any sample docs and restore ONLY user personal files & notes
   async function initCorpus() {
     try {
       const stored = await ArgusDB.getAll();
       if (stored && stored.length > 0) {
         for (const doc of stored) {
+          // If this document is from the sample dataset, purge it from IndexedDB!
+          if (doc.isSample || doc.docType === "Technical Paper" || SAMPLE_PATHS.has(doc.path)) {
+            await ArgusDB.delete(doc.id);
+            continue;
+          }
           engine.addDocument(doc);
-        }
-        updateCorpusStats();
-        updateLiveEngineStats();
-        updatePresetChipsState();
-        performSearch("");
-      } else {
-        const clearedByUser = localStorage.getItem("argus_cleared_by_user");
-        if (!clearedByUser) {
-          // First visit: automatically index sample dataset!
-          await loadSampleDataset(false);
-        } else {
-          updateCorpusStats();
-          updateLiveEngineStats();
-          updatePresetChipsState();
-          performSearch("");
         }
       }
     } catch (err) {
-      console.warn("ArgusDB boot failed, using empty index", err);
-      updateCorpusStats();
-      updateLiveEngineStats();
-      updatePresetChipsState();
-      performSearch("");
+      console.warn("ArgusDB boot failed", err);
     }
+
+    updateCorpusStats();
+    updateLiveEngineStats();
+    updatePresetChipsState();
+    performSearch("");
 
     if (searchInput) {
       searchInput.focus();
