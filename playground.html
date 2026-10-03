@@ -38,17 +38,29 @@
             </svg>
           </div>
           <span>argus</span>
-          <span style="color: var(--text-dim); font-size: 0.8rem; font-weight: 400;">// repl studio</span>
+          <span style="color: var(--text-dim); font-size: 0.8rem; font-weight: 400;">// search studio</span>
         </a>
 
         <div class="engine-status-pill" style="display: flex;">
           <span class="status-dot"></span>
-          <span id="header-engine-status">In-Memory V8 Engine Active</span>
+          <span id="header-engine-status">In-Memory V8 Engine</span>
         </div>
       </div>
 
       <div class="header-right">
-        <a href="index.html" class="btn-studio-secondary" style="text-decoration: none;">
+        <button id="btn-header-note" class="btn-studio-action" style="width: auto; height: 32px; padding: 0 12px; margin: 0; font-size: 0.74rem;">
+          <span>+ Add Note</span>
+        </button>
+
+        <button id="btn-header-upload" class="btn-studio-secondary" style="height: 32px; padding: 0 12px; font-size: 0.74rem;">
+          <span>📁 Upload Files</span>
+        </button>
+
+        <button id="btn-toggle-internals" class="btn-studio-secondary" style="height: 32px; padding: 0 12px; font-size: 0.74rem;" title="View BM25 Tuning, AST Query Plan &amp; Telemetry">
+          <span>⚡ Internals</span>
+        </button>
+
+        <a href="index.html" class="btn-studio-secondary" style="text-decoration: none; height: 32px; display: inline-flex; align-items: center;">
           <span>↖ Overview</span>
         </a>
 
@@ -67,360 +79,301 @@
     </div>
   </header>
 
-  <!-- Studio Workspace -->
-  <main class="studio-layout">
+  <!-- Clean & Focused Studio Workspace -->
+  <main class="clean-studio-layout">
 
-    <div class="studio-grid">
-
-      <!-- Left Column: Ingestion & Document Studio -->
-      <section class="studio-panel">
-        <div class="studio-panel-header">
-          <div class="studio-tabs">
-            <button class="studio-tab-btn active" data-tab="tab-files">
-              <span>📁 Search My Personal Files</span>
-            </button>
-            <button class="studio-tab-btn" data-tab="tab-add">
-              <span>+ Add Text Note</span>
-            </button>
-            <button class="studio-tab-btn" data-tab="tab-docs">
-              <span>📄 All Documents (<span id="tab-doc-count">0</span>)</span>
-            </button>
-            <button class="studio-tab-btn" data-tab="tab-bulk">
-              <span>📦 Bulk JSON Import</span>
-            </button>
-            <button class="studio-tab-btn" data-tab="tab-tuning">
-              <span>⚙️ BM25 Tuning</span>
-            </button>
-          </div>
+    <!-- Search Input Hero Card -->
+    <div class="clean-search-card">
+      <div class="clean-search-input-wrap">
+        <svg class="clean-search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input 
+          id="repl-search-input" 
+          name="queryInput"
+          type="text" 
+          class="clean-search-input" 
+          placeholder="Search indexed files &amp; notes (supports AND, OR, NOT, &quot;exact phrases&quot;)..." 
+          value=""
+          autocomplete="off"
+          spellcheck="false"
+        >
+        <button id="clear-search-btn" class="clear-search-btn" title="Clear query" style="display: none;">✕</button>
+        <div class="clean-search-latency" title="Search execution latency">
+          <span>Latency:</span> <strong id="latency-val">0.00 ms</strong>
         </div>
-
-        <!-- Tab 0: Search My Personal Files -->
-        <div id="tab-files" class="studio-tab-content active">
-          <div class="studio-label" style="margin-bottom: 8px;">INDEX YOUR LOCAL FILES &amp; SEARCH PRIVATELY IN-BROWSER</div>
-          <p style="font-size: 0.74rem; color: var(--text-dim); margin-bottom: 12px; line-height: 1.5;">
-            Select notes, codebases, Markdown files, or JSON from your computer. Files are indexed strictly in your browser's V8 memory using zero-copy TypedArrays.
-          </p>
-
-          <!-- Drag and Drop Zone -->
-          <div id="studio-dropzone" class="studio-dropzone">
-            <div class="dropzone-icon">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                <line x1="12" y1="11" x2="12" y2="17"/>
-                <polyline points="9 14 12 11 15 14"/>
-              </svg>
-            </div>
-            <div class="dropzone-title">Drop your personal files or folder here</div>
-            <div class="dropzone-subtitle">Supports .txt, .md, .json, .csv, .js, .ts, .py, code, and text files</div>
-
-            <div class="dropzone-actions">
-              <button id="btn-browse-files" class="btn-studio-action" style="width: auto; height: 32px; padding: 0 14px; margin: 0; font-size: 0.74rem;">
-                📄 Choose Files...
-              </button>
-              <button id="btn-browse-folder" class="btn-studio-secondary" style="height: 32px; padding: 0 14px; font-size: 0.74rem;">
-                📁 Choose Entire Folder...
-              </button>
-            </div>
-
-            <input type="file" id="local-file-input" multiple style="display: none;" accept=".txt,.md,.markdown,.json,.csv,.js,.ts,.tsx,.jsx,.py,.html,.css,.scss,.yml,.yaml,.sh,.sql,.log,.xml,.env">
-            <input type="file" id="local-folder-input" webkitdirectory directory multiple style="display: none;">
-          </div>
-
-          <!-- Personal Files Status Box -->
-          <div id="personal-files-status-box" class="file-stat-row">
-            <div>
-              <span style="color: var(--text-soft);">Indexed Personal Files:</span>
-              <strong id="personal-file-count" style="color: var(--accent); margin-left: 4px;">0 files</strong>
-            </div>
-            <button id="btn-clear-personal-files" class="btn-studio-secondary" style="font-size: 0.68rem; padding: 2px 8px; color: #f43f5e;" title="Remove only personal files">
-              Clear My Files
-            </button>
-          </div>
-
-          <!-- Personal Files List -->
-          <div class="studio-label" style="margin-bottom: 6px;">INDEXED PERSONAL FILES:</div>
-          <div id="personal-files-list" class="doc-list-scroll" style="max-height: 220px;">
-            <div style="padding: 16px; text-align: center; color: var(--text-dim); font-size: 0.76rem;">
-              No personal files indexed yet. Drag &amp; drop files above or click "Choose Files..." to test search against your local files!
-            </div>
-          </div>
-        </div>
-
-        <!-- Tab 1: Add Custom Document -->
-        <div id="tab-add" class="studio-tab-content">
-          <div class="studio-form-group">
-            <label class="studio-label" for="doc-title-input">DOCUMENT TITLE</label>
-            <input 
-              id="doc-title-input" 
-              type="text" 
-              class="studio-input" 
-              placeholder="e.g. Paxos Distributed Consensus Protocol"
-              autocomplete="off"
-            >
-          </div>
-
-          <div class="studio-form-group">
-            <label class="studio-label" for="doc-path-input">CATEGORY / PATH TAG</label>
-            <input 
-              id="doc-path-input" 
-              type="text" 
-              class="studio-input" 
-              placeholder="e.g. distributed-systems/consensus.md"
-              autocomplete="off"
-            >
-          </div>
-
-          <div class="studio-form-group">
-            <label class="studio-label" for="doc-body-input">DOCUMENT BODY / TEXT</label>
-            <textarea 
-              id="doc-body-input" 
-              class="studio-textarea" 
-              placeholder="Paste any article, research notes, technical documentation, or code comments here to index them into the engine..."
-            ></textarea>
-            <div class="studio-meta-bar">
-              <span>Words: <strong id="live-word-count" style="color: var(--accent);">0</strong></span>
-              <span>Chars: <span id="live-char-count">0</span></span>
-              <span>Est. Tokens: <span id="live-token-count">0</span></span>
-            </div>
-          </div>
-
-          <button id="btn-index-doc" class="btn-studio-action">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-            </svg>
-            <span>Index Document into Memory</span>
-          </button>
-
-          <!-- Quick Text Snippet Inserters -->
-          <div style="margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px;">
-            <div class="studio-label" style="margin-bottom: 8px;">QUICK TEMPLATE INSERTERS:</div>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <button id="btn-insert-note" class="btn-studio-secondary" style="font-size: 0.7rem;">+ Meeting Note</button>
-              <button id="btn-insert-spec" class="btn-studio-secondary" style="font-size: 0.7rem;">+ Technical Spec</button>
-              <button id="btn-insert-readme" class="btn-studio-secondary" style="font-size: 0.7rem;">+ Project README</button>
-            </div>
-          </div>
-
-          <!-- Token Pipeline Live Preview -->
-          <div style="margin-top: 16px;">
-            <div class="studio-label">ANALYZED STEMS (NFKD + PORTER):</div>
-            <div id="live-stem-chips" class="token-pipeline-stream" style="min-height: 34px;">
-              <span class="token-chip" style="opacity: 0.5;">Type text above to preview token stream...</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Tab 2: Manage Indexed Documents -->
-        <div id="tab-docs" class="studio-tab-content">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-            <span class="studio-label" style="margin: 0;">CORPUS DOCUMENTS</span>
-            <button id="btn-reset-corpus" class="btn-studio-secondary" style="font-size: 0.7rem; color: #f43f5e;">Clear All Documents</button>
-          </div>
-          
-          <input 
-            id="doc-filter-input" 
-            type="text" 
-            class="studio-input" 
-            placeholder="Filter indexed documents by title..."
-            style="margin-bottom: 12px;"
-          >
-
-          <div id="studio-doc-list" class="doc-list-scroll">
-            <!-- Rendered by playground.js -->
-          </div>
-        </div>
-
-        <!-- Tab 3: Bulk JSON Importer -->
-        <div id="tab-bulk" class="studio-tab-content">
-          <div class="studio-label" style="margin-bottom: 8px;">IMPORT DOCUMENTS FROM JSON:</div>
-          <p style="font-size: 0.74rem; color: var(--text-dim); margin-bottom: 12px; line-height: 1.5;">
-            Paste a JSON array of documents to index them in bulk into browser memory.
-          </p>
-
-          <textarea 
-            id="bulk-json-input" 
-            class="studio-textarea" 
-            style="min-height: 140px; font-size: 0.76rem;" 
-            placeholder='[&#10;  { "title": "Architecture Overview", "body": "Microservices communicate via gRPC with proto3 schemas..." },&#10;  { "title": "Deployment Runbook", "body": "Rollouts require healthy canary checks in region us-east-1..." }&#10;]'
-          ></textarea>
-
-          <button id="btn-ingest-json" class="btn-studio-action">
-            <span>⚡ Ingest JSON Documents</span>
-          </button>
-        </div>
-
-        <!-- Tab 4: BM25 Tuning -->
-        <div id="tab-tuning" class="studio-tab-content">
-          <div class="studio-label" style="margin-bottom: 12px;">OKAPI BM25 PARAMETER TUNER:</div>
-
-          <div style="margin-bottom: 18px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-              <span class="studio-label" style="margin: 0;">k₁ (Term Saturation):</span>
-              <strong id="k1-slider-val" style="color: var(--accent); font-family: var(--font-mono);">1.20</strong>
-            </div>
-            <input id="k1-slider" type="range" min="0.1" max="3.0" step="0.05" value="1.2" style="width: 100%; accent-color: var(--accent);">
-            <p style="font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; line-height: 1.4;">
-              Controls non-linear term frequency saturation. Higher values allow repeated terms to continually increase relevance.
-            </p>
-          </div>
-
-          <div style="margin-bottom: 18px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-              <span class="studio-label" style="margin: 0;">b (Length Penalty):</span>
-              <strong id="b-slider-val" style="color: var(--accent); font-family: var(--font-mono);">0.75</strong>
-            </div>
-            <input id="b-slider" type="range" min="0.0" max="1.0" step="0.05" value="0.75" style="width: 100%; accent-color: var(--accent);">
-            <p style="font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; line-height: 1.4;">
-              Normalizes scores against document length. Higher values penalize long documents more strictly.
-            </p>
-          </div>
-
-          <button id="btn-reset-bm25" class="btn-studio-secondary" style="width: 100%; font-size: 0.75rem;">
-            Reset to Standard Defaults (k₁=1.2, b=0.75)
-          </button>
-        </div>
-      </section>
-
-      <!-- Right Column: Interactive Search Console & Ranking Engine -->
-      <section class="terminal-window" style="box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);">
-        <!-- Terminal Header -->
-        <div class="terminal-header">
-          <div class="terminal-dots">
-            <span class="terminal-dot dot-rose"></span>
-            <span class="terminal-dot dot-amber"></span>
-            <span class="terminal-dot dot-emerald"></span>
-          </div>
-          <div class="terminal-title">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="4 17 10 11 4 5"/>
-              <line x1="12" y1="19" x2="20" y2="19"/>
-            </svg>
-            <span>argus — real-time query console</span>
-          </div>
-          <div class="terminal-status-tag">
-            <span class="status-dot" style="width: 5px; height: 5px;"></span>
-            <span id="corpus-status-pill">0 DOCS INDEXED</span>
-          </div>
-        </div>
-
-        <!-- Terminal Control Bar -->
-        <div class="terminal-control-bar">
-          <!-- Corpus Filter Bar -->
-          <div class="corpus-filter-bar">
-            <span style="color: var(--text-faint); margin-right: 4px;">Search In:</span>
-            <button class="corpus-filter-btn active" data-filter="all">All Documents (<span id="filter-count-all">0</span>)</button>
-            <button class="corpus-filter-btn" data-filter="files">📁 Uploaded Files (<span id="filter-count-files">0</span>)</button>
-            <button class="corpus-filter-btn" data-filter="notes">📝 Text Notes (<span id="filter-count-notes">0</span>)</button>
-          </div>
-
-          <div class="search-input-group">
-            <div class="search-field-wrap">
-              <svg class="search-field-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"/>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-              <input 
-                id="repl-search-input" 
-                name="queryInput"
-                type="text" 
-                class="terminal-search-input" 
-                placeholder="Search across indexed files &amp; notes (supports AND, OR, NOT, exact &quot;phrases&quot;)..." 
-                value=""
-                autocomplete="off"
-                spellcheck="false"
-              >
-              <button id="clear-search-btn" class="clear-search-btn" title="Clear query" style="display: none;">✕</button>
-            </div>
-
-            <div class="latency-metric-chip" title="Execution latency measured in microseconds">
-              <span>Latency:</span>
-              <span id="latency-val" class="latency-val">0.00 ms</span>
-            </div>
-          </div>
-
-          <!-- Quick Query Syntax Examples -->
-          <div class="query-presets-row">
-            <span class="presets-label">Query Syntax:</span>
-            <button class="preset-chip" data-query="error OR warning">error OR warning</button>
-            <button class="preset-chip" data-query="react AND typescript">react AND typescript</button>
-            <button class="preset-chip" data-query="config NOT staging">config NOT staging</button>
-            <button class="preset-chip" data-query="&quot;function main&quot;">"function main"</button>
-            <button class="preset-chip" data-query="database">database</button>
-          </div>
-        </div>
-
-        <!-- Split Terminal Body -->
-        <div class="terminal-split-body">
-          <!-- Left: Ranked Results Feed -->
-          <div class="terminal-results-pane">
-            <div class="pane-heading">
-              <span class="pane-title">Ranked BM25 Results</span>
-              <span id="results-count-badge" class="pane-badge">0 Matches</span>
-            </div>
-            <div id="repl-results-list" class="results-list">
-              <!-- Rendered via playground.js -->
-            </div>
-          </div>
-
-          <!-- Right: Engine Internals & Telemetry -->
-          <div class="terminal-telemetry-pane">
-            <div class="internals-block">
-              <div class="block-title">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                </svg>
-                <span>Analysis Stream (NFKD + Stopwords + Porter Stemmer)</span>
-              </div>
-              <div id="token-stream" class="token-pipeline-stream">
-                <span class="token-chip" style="opacity: 0.5;">No active search tokens</span>
-              </div>
-            </div>
-
-            <div class="internals-block">
-              <div class="block-title">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="16 18 22 12 16 6"/>
-                  <polyline points="8 6 2 12 8 18"/>
-                </svg>
-                <span>AST Query Evaluation Plan</span>
-              </div>
-              <pre id="ast-plan-pre" class="ast-tree-pre">EMPTY</pre>
-            </div>
-
-            <div class="internals-block">
-              <div class="block-title">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-                </svg>
-                <span>Engine Telemetry</span>
-              </div>
-              <div class="telemetry-grid">
-                <div class="telemetry-item">
-                  <div class="telemetry-lbl">Candidates Scanned</div>
-                  <div id="telem-candidates" class="telemetry-val">0</div>
-                </div>
-                <div class="telemetry-item">
-                  <div class="telemetry-lbl">Terms Looked Up</div>
-                  <div id="telem-terms" class="telemetry-val">0</div>
-                </div>
-                <div class="telemetry-item">
-                  <div class="telemetry-lbl">WAND Pruned</div>
-                  <div id="telem-pruned" class="telemetry-val">0</div>
-                </div>
-                <div class="telemetry-item">
-                  <div class="telemetry-lbl">Avg Doc Length</div>
-                  <div id="telem-avgdl" class="telemetry-val">0 terms</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
+      </div>
     </div>
 
+    <!-- Filter Pills & Presets Bar -->
+    <div class="clean-filter-bar">
+      <div class="clean-filter-pills">
+        <button class="clean-filter-pill corpus-filter-btn active" data-filter="all">All Documents (<span id="filter-count-all">0</span>)</button>
+        <button class="clean-filter-pill corpus-filter-btn" data-filter="files">📁 Files (<span id="filter-count-files">0</span>)</button>
+        <button class="clean-filter-pill corpus-filter-btn" data-filter="notes">📝 Notes (<span id="filter-count-notes">0</span>)</button>
+      </div>
+
+      <div class="clean-presets-row">
+        <span class="clean-presets-label">Examples:</span>
+        <button class="preset-chip" data-query="error OR warning">error OR warning</button>
+        <button class="preset-chip" data-query="react AND typescript">react AND typescript</button>
+        <button class="preset-chip" data-query="&quot;function main&quot;">"function main"</button>
+        <button class="preset-chip" data-query="database">database</button>
+      </div>
+    </div>
+
+    <!-- Clean Dropzone Hero -->
+    <div id="studio-dropzone" class="clean-dropzone-hero">
+      <div class="clean-dropzone-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          <line x1="12" y1="11" x2="12" y2="17"/>
+          <polyline points="9 14 12 11 15 14"/>
+        </svg>
+      </div>
+      <div class="clean-dropzone-title">Drop your files or folder to search privately</div>
+      <div class="clean-dropzone-sub">
+        Indexed securely in your browser's memory using typed inverted index. Supports .txt, .md, .json, .csv, code, and text files.
+      </div>
+      <div class="clean-dropzone-btns">
+        <button id="btn-browse-files" class="btn-studio-action" style="width: auto; height: 36px; padding: 0 16px; margin: 0; font-size: 0.78rem;">
+          📄 Choose Files...
+        </button>
+        <button id="btn-browse-folder" class="btn-studio-secondary" style="height: 36px; padding: 0 16px; font-size: 0.78rem;">
+          📁 Choose Entire Folder...
+        </button>
+        <button id="btn-dropzone-note" class="btn-studio-secondary" style="height: 36px; padding: 0 16px; font-size: 0.78rem;">
+          📝 Add Text Note...
+        </button>
+      </div>
+      <input type="file" id="local-file-input" multiple style="display: none;" accept=".txt,.md,.markdown,.json,.csv,.js,.ts,.tsx,.jsx,.py,.html,.css,.scss,.yml,.yaml,.sh,.sql,.log,.xml,.env">
+      <input type="file" id="local-folder-input" webkitdirectory directory multiple style="display: none;">
+    </div>
+
+    <!-- Corpus Status & Actions Bar -->
+    <div id="studio-status-bar" class="clean-status-bar" style="display: none;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="status-dot"></span>
+        <span id="corpus-status-pill">0 DOCS INDEXED</span>
+        <span style="color: var(--text-faint);">•</span>
+        <span id="personal-file-count" style="color: var(--text-soft);">0 files</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button id="btn-status-upload" class="btn-studio-secondary" style="font-size: 0.68rem; padding: 3px 8px;" title="Upload more files">
+          + Add Files
+        </button>
+        <button id="btn-status-note" class="btn-studio-secondary" style="font-size: 0.68rem; padding: 3px 8px;" title="Write a note">
+          + Add Note
+        </button>
+        <button id="btn-clear-personal-files" class="btn-studio-secondary" style="font-size: 0.68rem; padding: 3px 8px; color: #f43f5e;" title="Remove uploaded files">
+          Clear Files
+        </button>
+        <button id="btn-reset-corpus" class="btn-studio-secondary" style="font-size: 0.68rem; padding: 3px 8px; color: #f43f5e;" title="Clear all documents &amp; notes">
+          Clear All
+        </button>
+      </div>
+    </div>
+
+    <!-- Results Section -->
+    <section class="clean-results-section">
+      <div class="clean-results-header">
+        <span class="clean-results-title">Ranked Search Results</span>
+        <span id="results-count-badge" class="pane-badge">0 Matches</span>
+      </div>
+      <div id="repl-results-list" class="results-list">
+        <!-- Rendered via playground.js -->
+      </div>
+    </section>
+
   </main>
+
+  <!-- Developer Internals Slide-Out Drawer -->
+  <div id="internals-backdrop" class="internals-backdrop"></div>
+  <aside id="internals-drawer" class="internals-drawer">
+    <div class="internals-header">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="color: var(--accent); font-size: 1.1rem;">⚡</span>
+        <h3 style="font-size: 0.92rem; font-weight: 700; color: #ffffff;">Search Engine Internals</h3>
+      </div>
+      <button id="btn-close-internals" class="clear-search-btn" style="position: static; display: block; font-size: 1rem;">✕</button>
+    </div>
+
+    <div class="internals-body">
+      <!-- BM25 Tuning -->
+      <div class="internals-block">
+        <div class="block-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span>Okapi BM25 Tuning</span>
+        </div>
+
+        <div style="margin-bottom: 14px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <span class="studio-label" style="margin: 0;">k₁ (Term Saturation):</span>
+            <strong id="k1-slider-val" style="color: var(--accent); font-family: var(--font-mono);">1.20</strong>
+          </div>
+          <input id="k1-slider" type="range" min="0.1" max="3.0" step="0.05" value="1.2" style="width: 100%; accent-color: var(--accent);">
+        </div>
+
+        <div style="margin-bottom: 14px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <span class="studio-label" style="margin: 0;">b (Length Penalty):</span>
+            <strong id="b-slider-val" style="color: var(--accent); font-family: var(--font-mono);">0.75</strong>
+          </div>
+          <input id="b-slider" type="range" min="0.0" max="1.0" step="0.05" value="0.75" style="width: 100%; accent-color: var(--accent);">
+        </div>
+
+        <button id="btn-reset-bm25" class="btn-studio-secondary" style="width: 100%; font-size: 0.72rem;">
+          Reset to Defaults (k₁=1.2, b=0.75)
+        </button>
+      </div>
+
+      <!-- AST Evaluation Plan -->
+      <div class="internals-block">
+        <div class="block-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="16 18 22 12 16 6"/>
+            <polyline points="8 6 2 12 8 18"/>
+          </svg>
+          <span>AST Query Evaluation Plan</span>
+        </div>
+        <pre id="ast-plan-pre" class="ast-tree-pre">EMPTY</pre>
+      </div>
+
+      <!-- Analysis Stream -->
+      <div class="internals-block">
+        <div class="block-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          </svg>
+          <span>Analysis Stream (NFKD + Stopwords + Porter)</span>
+        </div>
+        <div id="token-stream" class="token-pipeline-stream">
+          <span class="token-chip" style="opacity: 0.5;">No active search tokens</span>
+        </div>
+      </div>
+
+      <!-- Engine Telemetry -->
+      <div class="internals-block">
+        <div class="block-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+          </svg>
+          <span>Engine Telemetry</span>
+        </div>
+        <div class="telemetry-grid">
+          <div class="telemetry-item">
+            <div class="telemetry-lbl">Candidates Scanned</div>
+            <div id="telem-candidates" class="telemetry-val">0</div>
+          </div>
+          <div class="telemetry-item">
+            <div class="telemetry-lbl">Terms Looked Up</div>
+            <div id="telem-terms" class="telemetry-val">0</div>
+          </div>
+          <div class="telemetry-item">
+            <div class="telemetry-lbl">WAND Pruned</div>
+            <div id="telem-pruned" class="telemetry-val">0</div>
+          </div>
+          <div class="telemetry-item">
+            <div class="telemetry-lbl">Avg Doc Length</div>
+            <div id="telem-avgdl" class="telemetry-val">0 terms</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bulk JSON Import -->
+      <div class="internals-block">
+        <div class="block-title">
+          <span>📦 Bulk JSON Import</span>
+        </div>
+        <textarea 
+          id="bulk-json-input" 
+          class="studio-textarea" 
+          style="min-height: 90px; font-size: 0.74rem;" 
+          placeholder='[{"title":"Note Title","body":"Content..."}]'
+        ></textarea>
+        <button id="btn-ingest-json" class="btn-studio-action" style="height: 32px; font-size: 0.74rem; margin-top: 6px;">
+          Ingest JSON Documents
+        </button>
+      </div>
+
+      <!-- Hidden compatibility elements for controller -->
+      <div style="display: none;">
+        <span id="tab-doc-count">0</span>
+        <span id="filter-count-personal">0</span>
+        <div id="personal-files-list"></div>
+        <div id="studio-doc-list"></div>
+        <input id="doc-filter-input" type="text">
+      </div>
+    </div>
+  </aside>
+
+  <!-- Add Note Modal -->
+  <div id="note-modal-backdrop" class="studio-modal-backdrop">
+    <div class="studio-modal-box" style="max-width: 640px;">
+      <div class="studio-modal-header">
+        <h3 style="font-size: 0.95rem; color: #ffffff; font-weight: 700;">+ Add New Note / Document</h3>
+        <button id="note-modal-close-btn" class="clear-search-btn" style="position: static; display: block; font-size: 1.1rem;">✕</button>
+      </div>
+      <div style="padding: 20px;">
+        <div class="studio-form-group">
+          <label class="studio-label" for="doc-title-input">DOCUMENT TITLE</label>
+          <input 
+            id="doc-title-input" 
+            type="text" 
+            class="studio-input" 
+            placeholder="e.g. Paxos Distributed Consensus Protocol"
+            autocomplete="off"
+          >
+        </div>
+
+        <div class="studio-form-group">
+          <label class="studio-label" for="doc-path-input">CATEGORY / PATH TAG (OPTIONAL)</label>
+          <input 
+            id="doc-path-input" 
+            type="text" 
+            class="studio-input" 
+            placeholder="e.g. notes/consensus.md"
+            autocomplete="off"
+          >
+        </div>
+
+        <div class="studio-form-group">
+          <label class="studio-label" for="doc-body-input">DOCUMENT BODY / TEXT</label>
+          <textarea 
+            id="doc-body-input" 
+            class="studio-textarea" 
+            placeholder="Paste any article, research notes, technical documentation, or code comments here..."
+            style="min-height: 120px;"
+          ></textarea>
+          <div class="studio-meta-bar">
+            <span>Words: <strong id="live-word-count" style="color: var(--accent);">0</strong></span>
+            <span>Chars: <span id="live-char-count">0</span></span>
+            <span>Est. Tokens: <span id="live-token-count">0</span></span>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
+          <button id="btn-insert-note" class="btn-studio-secondary" style="font-size: 0.7rem;">+ Meeting Note</button>
+          <button id="btn-insert-spec" class="btn-studio-secondary" style="font-size: 0.7rem;">+ Technical Spec</button>
+          <button id="btn-insert-readme" class="btn-studio-secondary" style="font-size: 0.7rem;">+ README</button>
+        </div>
+
+        <div style="display: none;" id="live-stem-chips"></div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button id="note-modal-cancel-btn" class="btn-studio-secondary" style="height: 38px; padding: 0 16px;">Cancel</button>
+          <button id="btn-index-doc" class="btn-studio-action" style="width: auto; height: 38px; padding: 0 18px; margin: 0;">
+            ⚡ Index into Memory
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Document Inspector Modal -->
   <div id="studio-modal-backdrop" class="studio-modal-backdrop">

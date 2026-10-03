@@ -657,6 +657,23 @@ document.addEventListener("DOMContentLoaded", () => {
   const filterCountNotes = document.getElementById("filter-count-notes");
   const filterCountPersonal = document.getElementById("filter-count-personal");
 
+  // Status & Header Action Elements
+  const studioStatusBar = document.getElementById("studio-status-bar");
+  const btnStatusUpload = document.getElementById("btn-status-upload");
+  const btnStatusNote = document.getElementById("btn-status-note");
+  const btnHeaderNote = document.getElementById("btn-header-note");
+  const btnHeaderUpload = document.getElementById("btn-header-upload");
+  const btnToggleInternals = document.getElementById("btn-toggle-internals");
+  const btnCloseInternals = document.getElementById("btn-close-internals");
+  const internalsDrawer = document.getElementById("internals-drawer");
+  const internalsBackdrop = document.getElementById("internals-backdrop");
+
+  // Note Modal Elements
+  const noteModalBackdrop = document.getElementById("note-modal-backdrop");
+  const noteModalCloseBtn = document.getElementById("note-modal-close-btn");
+  const noteModalCancelBtn = document.getElementById("note-modal-cancel-btn");
+  const btnDropzoneNote = document.getElementById("btn-dropzone-note");
+
   // Personal File Ingestion Elements
   const dropzone = document.getElementById("studio-dropzone");
   const localFileInput = document.getElementById("local-file-input");
@@ -718,6 +735,55 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 2500);
   }
 
+  // Note Modal toggles
+  function openNoteModal() {
+    if (noteModalBackdrop) {
+      noteModalBackdrop.classList.add("open");
+      if (docTitleInput) docTitleInput.focus();
+    }
+  }
+
+  function closeNoteModal() {
+    if (noteModalBackdrop) {
+      noteModalBackdrop.classList.remove("open");
+    }
+  }
+
+  if (btnHeaderNote) btnHeaderNote.addEventListener("click", openNoteModal);
+  if (btnDropzoneNote) btnDropzoneNote.addEventListener("click", openNoteModal);
+  if (btnStatusNote) btnStatusNote.addEventListener("click", openNoteModal);
+  if (noteModalCloseBtn) noteModalCloseBtn.addEventListener("click", closeNoteModal);
+  if (noteModalCancelBtn) noteModalCancelBtn.addEventListener("click", closeNoteModal);
+
+  if (noteModalBackdrop) {
+    noteModalBackdrop.addEventListener("click", (e) => {
+      if (e.target === noteModalBackdrop) closeNoteModal();
+    });
+  }
+
+  // Upload triggers from header & status bar
+  if (btnHeaderUpload && localFileInput) {
+    btnHeaderUpload.addEventListener("click", () => localFileInput.click());
+  }
+  if (btnStatusUpload && localFileInput) {
+    btnStatusUpload.addEventListener("click", () => localFileInput.click());
+  }
+
+  // Internals Drawer toggles
+  function toggleInternals() {
+    if (internalsDrawer) internalsDrawer.classList.toggle("open");
+    if (internalsBackdrop) internalsBackdrop.classList.toggle("open");
+  }
+
+  function closeInternals() {
+    if (internalsDrawer) internalsDrawer.classList.remove("open");
+    if (internalsBackdrop) internalsBackdrop.classList.remove("open");
+  }
+
+  if (btnToggleInternals) btnToggleInternals.addEventListener("click", toggleInternals);
+  if (btnCloseInternals) btnCloseInternals.addEventListener("click", closeInternals);
+  if (internalsBackdrop) internalsBackdrop.addEventListener("click", closeInternals);
+
   // Tab Switching
   document.querySelectorAll(".studio-tab-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -776,12 +842,13 @@ document.addEventListener("DOMContentLoaded", () => {
     // Render Results
     if (response.results.length === 0) {
       if (engine.documents.size === 0) {
+        resultsCountBadge.textContent = "0 Matches";
         resultsContainer.innerHTML = `
-          <div class="no-results" style="padding: 36px 20px;">
-            <div style="font-size: 2rem; margin-bottom: 12px;">📁</div>
-            <div style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin-bottom: 6px;">Zero Documents Indexed Yet</div>
-            <p style="margin: 0 auto; max-width: 420px; font-size: 0.78rem; color: var(--text-dim); line-height: 1.5;">
-              Drop your personal files or folder in the left panel, add a custom text note, or import JSON to search locally in memory.
+          <div class="no-results" style="padding: 28px 20px; text-align: center;">
+            <div style="font-size: 1.8rem; margin-bottom: 8px;">📁</div>
+            <div style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin-bottom: 4px;">Zero Documents Indexed Yet</div>
+            <p style="margin: 0 auto; max-width: 440px; font-size: 0.78rem; color: var(--text-dim); line-height: 1.5;">
+              Drop your files or folder above, or click "+ Add Note" to search your content locally and privately in memory.
             </p>
           </div>
         `;
@@ -789,31 +856,53 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (!query.trim()) {
-        resultsContainer.innerHTML = `
-          <div class="no-results" style="padding: 36px 20px;">
-            <div style="font-size: 1.8rem; margin-bottom: 12px; opacity: 0.7;">⚡</div>
-            <div style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin-bottom: 6px;">Ready for Query Evaluation</div>
-            <p style="margin: 0 auto; max-width: 420px; font-size: 0.78rem; color: var(--text-dim); line-height: 1.5;">
-              Type keywords in the search bar above. You can combine terms with <code>AND</code>, <code>OR</code>, <code>NOT</code>, or search exact phrases with <code>"quotes"</code>.
-            </p>
-          </div>
-        `;
+        const allDocs = Array.from(engine.documents.values()).slice(0, 30);
+        resultsCountBadge.textContent = `${allDocs.length} Document${allDocs.length === 1 ? '' : 's'} Ready`;
+        resultsContainer.innerHTML = allDocs.map((doc, idx) => {
+          const typeLabel = doc.docType || (doc.isFile ? "File" : "Note");
+          const typeBadge = `<span class="file-pill-badge">${doc.isFile ? '📁 ' : '📝 '}${escapeHtml(typeLabel)}</span>`;
+          const termCount = engine.docLengths.get(doc.id) || 0;
+          const snippetText = escapeHtml((doc.body || "").replace(/\s+/g, " ").trim().slice(0, 220));
+          return `
+            <article class="result-card" data-doc-id="${doc.id}">
+              <div class="result-header">
+                <span class="result-rank-num">#${idx + 1}</span>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px; flex-wrap: wrap;">
+                    <h3 class="result-title">${escapeHtml(doc.title)}</h3>
+                    ${typeBadge}
+                  </div>
+                  <div class="result-path">${escapeHtml(doc.path)}</div>
+                </div>
+                <span class="bm25-score-pill">${termCount} terms</span>
+              </div>
+              <div class="result-snippet">${snippetText}${snippetText.length >= 220 ? '…' : ''}</div>
+            </article>
+          `;
+        }).join("");
+
+        resultsContainer.querySelectorAll(".result-card").forEach(card => {
+          card.addEventListener("click", () => {
+            const id = parseInt(card.getAttribute("data-doc-id"), 10);
+            openDocumentModal(id);
+          });
+        });
         return;
       }
 
       resultsContainer.innerHTML = `
-        <div class="no-results">
+        <div class="no-results" style="padding: 28px 20px; text-align: center;">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto 10px; opacity: 0.4;">
             <circle cx="11" cy="11" r="8"/>
             <line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
           <div>No indexed documents match <code>"${escapeHtml(query)}"</code></div>
-          <p style="margin-top: 6px; font-size: 0.72rem; color: var(--text-dim);">
+          <p style="margin-top: 6px; font-size: 0.74rem; color: var(--text-dim);">
             ${activeCorpusFilter === "files" 
               ? "No matches found in uploaded files. Drop more files or switch filter to 'All Documents'!" 
               : activeCorpusFilter === "notes"
               ? "No matches found in text notes. Switch filter to 'All Documents' or add more text!"
-              : "Drop personal files or add custom text in the studio panel to index new terms!"}
+              : "Try different search terms, exact phrases, or index additional documents!"}
           </p>
         </div>
       `;
@@ -879,6 +968,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (filterCountNotes) filterCountNotes.textContent = noteDocs.length;
     if (filterCountPersonal) filterCountPersonal.textContent = fileDocs.length;
     if (personalFileCount) personalFileCount.textContent = `${fileDocs.length} file${fileDocs.length === 1 ? '' : 's'}`;
+
+    if (studioStatusBar) {
+      studioStatusBar.style.display = allDocs.length > 0 ? "flex" : "none";
+    }
+    if (dropzone) {
+      dropzone.style.display = allDocs.length > 0 ? "none" : "flex";
+    }
 
     renderDocumentList();
     renderPersonalFilesList(fileDocs);
@@ -1314,6 +1410,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     updateCorpusStats();
     showToast(`Indexed "${doc.title}" into memory (+${engine.docLengths.get(doc.id)} terms)`);
+    closeNoteModal();
 
     docTitleInput.value = "";
     docPathInput.value = "";
@@ -1365,87 +1462,100 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Document Filter
-  docFilterInput.addEventListener("input", () => {
-    renderDocumentList(docFilterInput.value);
-  });
+  if (docFilterInput) {
+    docFilterInput.addEventListener("input", () => {
+      renderDocumentList(docFilterInput.value);
+    });
+  }
 
   // Reset / Clear Corpus
-  btnResetCorpus.addEventListener("click", () => {
-    if (engine.documents.size === 0) {
-      showToast("Index is already empty");
-      return;
-    }
-    if (confirm("Clear all indexed documents and notes from memory?")) {
-      engine.documents.clear();
-      engine.docLengths.clear();
-      engine.postings.clear();
-      engine.totalDocLength = 0;
-      activeCorpusFilter = "all";
-      updateFilterButtons();
-      updateCorpusStats();
-      performSearch(searchInput.value);
-      showToast("Cleared all documents from in-memory index");
-    }
-  });
-
-  // Bulk Ingest JSON
-  btnIngestJson.addEventListener("click", () => {
-    const raw = bulkJsonInput.value.trim();
-    if (!raw) {
-      alert("Please paste a JSON array of documents.");
-      return;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) {
-        alert("Expected an array of documents: [{ title, body }]");
+  if (btnResetCorpus) {
+    btnResetCorpus.addEventListener("click", () => {
+      if (engine.documents.size === 0) {
+        showToast("Index is already empty");
         return;
       }
-      let count = 0;
-      for (const item of parsed) {
-        if (item.title || item.body) {
-          engine.addDocument({
-            ...item,
-            isFile: false,
-            isNote: true
-          });
-          count++;
-        }
+      if (confirm("Clear all indexed documents and notes from memory?")) {
+        engine.documents.clear();
+        engine.docLengths.clear();
+        engine.postings.clear();
+        engine.totalDocLength = 0;
+        activeCorpusFilter = "all";
+        updateFilterButtons();
+        updateCorpusStats();
+        performSearch(searchInput.value);
+        showToast("Cleared all documents from in-memory index");
       }
-      activeCorpusFilter = "notes";
-      updateFilterButtons();
-      updateCorpusStats();
-      performSearch(searchInput.value);
-      showToast(`Successfully indexed ${count} JSON documents`);
-      bulkJsonInput.value = "";
-    } catch (err) {
-      alert("JSON Syntax Error: " + err.message);
-    }
-  });
+    });
+  }
+
+  // Bulk Ingest JSON
+  if (btnIngestJson && bulkJsonInput) {
+    btnIngestJson.addEventListener("click", () => {
+      const raw = bulkJsonInput.value.trim();
+      if (!raw) {
+        alert("Please paste a JSON array of documents.");
+        return;
+      }
+      try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+          alert("Expected an array of documents: [{ title, body }]");
+          return;
+        }
+        let count = 0;
+        for (const item of parsed) {
+          if (item.title || item.body) {
+            engine.addDocument({
+              ...item,
+              isFile: false,
+              isNote: true
+            });
+            count++;
+          }
+        }
+        activeCorpusFilter = "notes";
+        updateFilterButtons();
+        updateCorpusStats();
+        performSearch(searchInput.value);
+        showToast(`Successfully indexed ${count} JSON documents`);
+        bulkJsonInput.value = "";
+        closeInternals();
+      } catch (err) {
+        alert("JSON Syntax Error: " + err.message);
+      }
+    });
+  }
 
   // BM25 Sliders
-  k1Slider.addEventListener("input", () => {
-    engine.k1 = parseFloat(k1Slider.value);
-    k1Val.textContent = engine.k1.toFixed(2);
-    performSearch(searchInput.value);
-  });
+  if (k1Slider && k1Val) {
+    k1Slider.addEventListener("input", () => {
+      engine.k1 = parseFloat(k1Slider.value);
+      k1Val.textContent = engine.k1.toFixed(2);
+      performSearch(searchInput.value);
+    });
+  }
 
-  bSlider.addEventListener("input", () => {
-    engine.b = parseFloat(bSlider.value);
-    bVal.textContent = engine.b.toFixed(2);
-    performSearch(searchInput.value);
-  });
+  if (bSlider && bVal) {
+    bSlider.addEventListener("input", () => {
+      engine.b = parseFloat(bSlider.value);
+      bVal.textContent = engine.b.toFixed(2);
+      performSearch(searchInput.value);
+    });
+  }
 
-  btnResetBM25.addEventListener("click", () => {
-    engine.k1 = 1.2;
-    engine.b = 0.75;
-    k1Slider.value = 1.2;
-    bSlider.value = 0.75;
-    k1Val.textContent = "1.20";
-    bVal.textContent = "0.75";
-    performSearch(searchInput.value);
-    showToast("BM25 parameters reset to defaults (k1=1.2, b=0.75)");
-  });
+  if (btnResetBM25 && k1Slider && bSlider && k1Val && bVal) {
+    btnResetBM25.addEventListener("click", () => {
+      engine.k1 = 1.2;
+      engine.b = 0.75;
+      k1Slider.value = 1.2;
+      bSlider.value = 0.75;
+      k1Val.textContent = "1.20";
+      bVal.textContent = "0.75";
+      performSearch(searchInput.value);
+      showToast("BM25 parameters reset to defaults (k1=1.2, b=0.75)");
+    });
+  }
 
   // Search input events
   searchInput.addEventListener("input", () => {
@@ -1480,7 +1590,22 @@ document.addEventListener("DOMContentLoaded", () => {
       searchInput.select();
     }
     if (e.key === "Escape") {
-      modalBackdrop.classList.remove("open");
+      if (modalBackdrop) modalBackdrop.classList.remove("open");
+      if (noteModalBackdrop) noteModalBackdrop.classList.remove("open");
+      if (internalsDrawer) internalsDrawer.classList.remove("open");
+      if (internalsBackdrop) internalsBackdrop.classList.remove("open");
+    }
+  });
+
+  // Window Drag & Drop Support
+  window.addEventListener("dragover", (e) => {
+    e.preventDefault();
+  });
+
+  window.addEventListener("drop", (e) => {
+    e.preventDefault();
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processLocalFiles(e.dataTransfer.files);
     }
   });
 
