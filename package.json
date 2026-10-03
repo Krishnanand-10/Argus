@@ -12,8 +12,10 @@
     "dist",
     "bin",
     "index.html",
+    "playground.html",
     "styles.css",
     "app.js",
+    "playground.js",
     "README.md",
     "LICENSE"
   ],

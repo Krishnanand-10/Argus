@@ -87,9 +87,20 @@ export class ArgusServer {
       return;
     }
 
-    // Route: Static files (index.html, styles.css, app.js) or fallback UI
-    if (method === 'GET' && (pathname === '/' || pathname === '/index.html' || pathname === '/styles.css' || pathname === '/app.js')) {
-      const fileName = pathname === '/' ? 'index.html' : pathname.slice(1);
+    // Route: Static files (index.html, playground.html, styles.css, app.js, playground.js) or fallback UI
+    const staticRoutes: Record<string, string> = {
+      '/': 'index.html',
+      '/index.html': 'index.html',
+      '/playground': 'playground.html',
+      '/playground.html': 'playground.html',
+      '/repl': 'playground.html',
+      '/styles.css': 'styles.css',
+      '/app.js': 'app.js',
+      '/playground.js': 'playground.js',
+    };
+
+    if (method === 'GET' && staticRoutes[pathname]) {
+      const fileName = staticRoutes[pathname];
       const candidates = [
         path.resolve(process.cwd(), fileName),
         path.resolve(__dirname, '../../', fileName),
@@ -110,7 +121,7 @@ export class ArgusServer {
         }
       }
 
-      if (pathname === '/' || pathname === '/index.html') {
+      if (fileName === 'index.html') {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(this.renderSearchUI());
         return;
@@ -154,6 +165,15 @@ export class ArgusServer {
       const stats = this.engine.getStats();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(stats));
+      return;
+    }
+
+    // Route: GET /api/documents -> List all indexed documents
+    if (method === 'GET' && pathname === '/api/documents') {
+      const documents = this.engine.invertedIndex.getAllDocuments();
+      const stats = this.engine.getStats();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ documents, stats }));
       return;
     }
 
@@ -241,17 +261,26 @@ export class ArgusServer {
       });
       req.on('end', async () => {
         try {
-          const doc = JSON.parse(body) as IndexableDocument;
-          if (doc && typeof doc.id === 'number') {
-            await this.engine.addDocument(doc);
+          const doc = JSON.parse(body) as Partial<IndexableDocument>;
+          if (doc && typeof doc === 'object') {
+            const existingDocs = this.engine.invertedIndex.getAllDocuments();
+            const nextId = existingDocs.reduce((max, d) => Math.max(max, d.id), 0) + 1;
+            const fullDoc: IndexableDocument = {
+              id: typeof doc.id === 'number' ? doc.id : nextId,
+              title: doc.title || 'Untitled Document',
+              body: doc.body || '',
+              path: doc.path,
+              tags: doc.tags,
+            };
+            await this.engine.addDocument(fullDoc);
             if (this.indexPath) {
               await this.engine.commit(this.indexPath);
             }
             res.writeHead(201, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true, docId: doc.id }));
+            res.end(JSON.stringify({ success: true, docId: fullDoc.id, stats: this.engine.getStats() }));
           } else {
             res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Document must contain a numerical id field' }));
+            res.end(JSON.stringify({ error: 'Document must be an object' }));
           }
         } catch (err: any) {
           res.writeHead(400, { 'Content-Type': 'application/json' });

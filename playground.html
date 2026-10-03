@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Argus REPL — Interactive In-Memory Search & Document Studio</title>
+  
+  <meta name="description" content="Interactive browser search REPL and document studio for Argus. Index custom text, adjust BM25 parameters, and evaluate boolean AST queries in real time.">
+  <meta name="author" content="Krishnanand Tiwari">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none'><rect width='32' height='32' rx='8' fill='%230e0e13' stroke='%2322222b' stroke-width='1.5'/><circle cx='16' cy='16' r='6' stroke='%2300d2ff' stroke-width='2'/><circle cx='16' cy='16' r='2' fill='%2300d2ff'/><line x1='16' y1='6' x2='16' y2='9' stroke='%2300d2ff' stroke-width='2'/><line x1='16' y1='23' x2='16' y2='26' stroke='%2300d2ff' stroke-width='2'/><line x1='6' y1='16' x2='9' y2='16' stroke='%2300d2ff' stroke-width='2'/><line x1='23' y1='16' x2='26' y2='16' stroke='%2300d2ff' stroke-width='2'/></svg>">
+
+  <!-- Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Background Atmosphere -->
+  <div class="grid-layer"></div>
+  <div class="hero-radial-glow"></div>
+
+  <!-- Studio Header -->
+  <header id="site-header">
+    <div class="header-inner">
+      <div style="display: flex; align-items: center; gap: 20px;">
+        <a href="index.html" class="header-brand" title="Back to Argus Overview">
+          <div class="brand-icon-box">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"/>
+              <circle cx="12" cy="12" r="3" fill="currentColor"/>
+              <line x1="12" y1="3" x2="12" y2="6"/>
+              <line x1="12" y1="18" x2="12" y2="21"/>
+            </svg>
+          </div>
+          <span>argus</span>
+          <span style="color: var(--text-dim); font-size: 0.8rem; font-weight: 400;">// repl studio</span>
+        </a>
+
+        <div class="engine-status-pill" style="display: flex;">
+          <span class="status-dot"></span>
+          <span id="header-engine-status">In-Memory V8 Engine Active</span>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <a href="index.html" class="btn-studio-secondary" style="text-decoration: none;">
+          <span>↖ Overview</span>
+        </a>
+
+        <a href="https://www.npmjs.com/package/argus-search" target="_blank" rel="noopener noreferrer" class="btn-header-icon btn-npm" title="View on npm: argus-search">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M1.763 0C.786 0 0 .786 0 1.763v20.474C0 23.214.786 24 1.763 24h20.474c.977 0 1.763-.786 1.763-1.763V1.763C24 .786 23.214 0 22.237 0zM5.13 5.323l13.837.019-.009 13.836h-3.464l.01-10.382h-3.456L12.04 19.17H5.113z"/>
+          </svg>
+        </a>
+
+        <a href="https://github.com/Krishnanand-10/Argus" target="_blank" rel="noopener noreferrer" class="btn-header-icon" title="View Source on GitHub">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Studio Workspace -->
+  <main class="studio-layout">
+
+    <div class="studio-grid">
+
+      <!-- Left Column: Ingestion & Document Studio -->
+      <section class="studio-panel">
+        <div class="studio-panel-header">
+          <div class="studio-tabs">
+            <button class="studio-tab-btn active" data-tab="tab-add">
+              <span>+ Add Document</span>
+            </button>
+            <button class="studio-tab-btn" data-tab="tab-docs">
+              <span>📄 Documents (<span id="tab-doc-count">10</span>)</span>
+            </button>
+            <button class="studio-tab-btn" data-tab="tab-bulk">
+              <span>📦 Datasets &amp; JSON</span>
+            </button>
+            <button class="studio-tab-btn" data-tab="tab-tuning">
+              <span>⚙️ BM25 Tuning</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tab 1: Add Custom Document -->
+        <div id="tab-add" class="studio-tab-content active">
+          <div class="studio-form-group">
+            <label class="studio-label" for="doc-title-input">DOCUMENT TITLE</label>
+            <input 
+              id="doc-title-input" 
+              type="text" 
+              class="studio-input" 
+              placeholder="e.g. Paxos Distributed Consensus Protocol"
+              autocomplete="off"
+            >
+          </div>
+
+          <div class="studio-form-group">
+            <label class="studio-label" for="doc-path-input">CATEGORY / PATH TAG</label>
+            <input 
+              id="doc-path-input" 
+              type="text" 
+              class="studio-input" 
+              placeholder="e.g. distributed-systems/consensus.md"
+              autocomplete="off"
+            >
+          </div>
+
+          <div class="studio-form-group">
+            <label class="studio-label" for="doc-body-input">DOCUMENT BODY / TEXT</label>
+            <textarea 
+              id="doc-body-input" 
+              class="studio-textarea" 
+              placeholder="Paste any article, research notes, technical documentation, or code comments here to index them into the engine..."
+            ></textarea>
+            <div class="studio-meta-bar">
+              <span>Words: <strong id="live-word-count" style="color: var(--accent);">0</strong></span>
+              <span>Chars: <span id="live-char-count">0</span></span>
+              <span>Est. Tokens: <span id="live-token-count">0</span></span>
+            </div>
+          </div>
+
+          <button id="btn-index-doc" class="btn-studio-action">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+            <span>Index Document into Memory</span>
+          </button>
+
+          <!-- Quick Text Snippet Inserters -->
+          <div style="margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px;">
+            <div class="studio-label" style="margin-bottom: 8px;">QUICK SAMPLE INSERTERS:</div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button id="btn-insert-raft" class="btn-studio-secondary" style="font-size: 0.7rem;">+ Raft Consensus</button>
+              <button id="btn-insert-quantum" class="btn-studio-secondary" style="font-size: 0.7rem;">+ Quantum Cryptography</button>
+              <button id="btn-insert-vector" class="btn-studio-secondary" style="font-size: 0.7rem;">+ Vector Embeddings</button>
+            </div>
+          </div>
+
+          <!-- Token Pipeline Live Preview -->
+          <div style="margin-top: 16px;">
+            <div class="studio-label">ANALYZED STEMS (NFKD + PORTER):</div>
+            <div id="live-stem-chips" class="token-pipeline-stream" style="min-height: 34px;">
+              <span class="token-chip" style="opacity: 0.5;">Type text above to preview token stream...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Manage Indexed Documents -->
+        <div id="tab-docs" class="studio-tab-content">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+            <span class="studio-label" style="margin: 0;">CORPUS DOCUMENTS</span>
+            <button id="btn-reset-corpus" class="btn-studio-secondary" style="font-size: 0.7rem; color: #f43f5e;">Reset to Default</button>
+          </div>
+          
+          <input 
+            id="doc-filter-input" 
+            type="text" 
+            class="studio-input" 
+            placeholder="Filter indexed documents by title..."
+            style="margin-bottom: 12px;"
+          >
+
+          <div id="studio-doc-list" class="doc-list-scroll">
+            <!-- Rendered by playground.js -->
+          </div>
+        </div>
+
+        <!-- Tab 3: Bulk / Sample Datasets & JSON -->
+        <div id="tab-bulk" class="studio-tab-content">
+          <div class="studio-label" style="margin-bottom: 8px;">PRE-LOADED RESEARCH DATASETS:</div>
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px;">
+            <button id="btn-load-distrib" class="btn-studio-secondary" style="text-align: left; padding: 10px 12px;">
+              <div style="font-weight: 600; color: #ffffff;">⚡ Distributed Systems &amp; Consensus (10 docs)</div>
+              <div style="font-size: 0.7rem; color: var(--text-dim);">Paxos, Raft, Byzantine Quorums, Vector Clocks, Dynamo</div>
+            </button>
+            <button id="btn-load-ir" class="btn-studio-secondary" style="text-align: left; padding: 10px 12px;">
+              <div style="font-weight: 600; color: #ffffff;">🔍 Information Retrieval &amp; Ranking (8 docs)</div>
+              <div style="font-size: 0.7rem; color: var(--text-dim);">Inverted Index, BM25, Skip Lists, WAND Pruning, Porter Stemmer</div>
+            </button>
+          </div>
+
+          <div class="studio-label" for="bulk-json-input">OR PASTE RAW JSON ARRAY:</div>
+          <textarea 
+            id="bulk-json-input" 
+            class="studio-textarea" 
+            style="min-height: 120px; font-size: 0.76rem;" 
+            placeholder='[&#10;  { "title": "Custom Document 1", "body": "Text contents..." },&#10;  { "title": "Custom Document 2", "body": "More text..." }&#10;]'
+          ></textarea>
+
+          <button id="btn-ingest-json" class="btn-studio-action">
+            <span>⚡ Ingest JSON Documents</span>
+          </button>
+        </div>
+
+        <!-- Tab 4: BM25 Tuning -->
+        <div id="tab-tuning" class="studio-tab-content">
+          <div class="studio-label" style="margin-bottom: 12px;">OKAPI BM25 PARAMETER TUNER:</div>
+
+          <div style="margin-bottom: 18px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <span class="studio-label" style="margin: 0;">k₁ (Term Saturation):</span>
+              <strong id="k1-slider-val" style="color: var(--accent); font-family: var(--font-mono);">1.20</strong>
+            </div>
+            <input id="k1-slider" type="range" min="0.1" max="3.0" step="0.05" value="1.2" style="width: 100%; accent-color: var(--accent);">
+            <p style="font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; line-height: 1.4;">
+              Controls non-linear term frequency saturation. Higher values allow repeated terms to continually increase relevance.
+            </p>
+          </div>
+
+          <div style="margin-bottom: 18px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <span class="studio-label" style="margin: 0;">b (Length Penalty):</span>
+              <strong id="b-slider-val" style="color: var(--accent); font-family: var(--font-mono);">0.75</strong>
+            </div>
+            <input id="b-slider" type="range" min="0.0" max="1.0" step="0.05" value="0.75" style="width: 100%; accent-color: var(--accent);">
+            <p style="font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; line-height: 1.4;">
+              Normalizes scores against document length. Higher values penalize long documents more strictly.
+            </p>
+          </div>
+
+          <button id="btn-reset-bm25" class="btn-studio-secondary" style="width: 100%; font-size: 0.75rem;">
+            Reset to Standard Defaults (k₁=1.2, b=0.75)
+          </button>
+        </div>
+      </section>
+
+      <!-- Right Column: Interactive Search Console & Ranking Engine -->
+      <section class="terminal-window" style="box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);">
+        <!-- Terminal Header -->
+        <div class="terminal-header">
+          <div class="terminal-dots">
+            <span class="terminal-dot dot-rose"></span>
+            <span class="terminal-dot dot-amber"></span>
+            <span class="terminal-dot dot-emerald"></span>
+          </div>
+          <div class="terminal-title">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="4 17 10 11 4 5"/>
+              <line x1="12" y1="19" x2="20" y2="19"/>
+            </svg>
+            <span>argus — real-time query console</span>
+          </div>
+          <div class="terminal-status-tag">
+            <span class="status-dot" style="width: 5px; height: 5px;"></span>
+            <span id="corpus-status-pill">10 DOCS INDEXED</span>
+          </div>
+        </div>
+
+        <!-- Terminal Control Bar -->
+        <div class="terminal-control-bar">
+          <div class="search-input-group">
+            <div class="search-field-wrap">
+              <svg class="search-field-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input 
+                id="repl-search-input" 
+                name="queryInput"
+                type="text" 
+                class="terminal-search-input" 
+                placeholder="Search across all indexed documents (supports AND, OR, NOT, exact &quot;phrases&quot;)..." 
+                value="distributed consensus"
+                autocomplete="off"
+                spellcheck="false"
+              >
+              <button id="clear-search-btn" class="clear-search-btn" title="Clear query">✕</button>
+            </div>
+
+            <div class="latency-metric-chip" title="Execution latency measured in microseconds">
+              <span>Latency:</span>
+              <span id="latency-val" class="latency-val">0.38 ms</span>
+            </div>
+          </div>
+
+          <!-- Quick Query Presets -->
+          <div class="query-presets-row">
+            <span class="presets-label">Preset Queries:</span>
+            <button class="preset-chip active" data-query="distributed consensus">"distributed consensus"</button>
+            <button class="preset-chip" data-query="byzantine fault">"byzantine fault"</button>
+            <button class="preset-chip" data-query="bm25 AND inverted">bm25 AND inverted</button>
+            <button class="preset-chip" data-query="varint d-gap">varint d-gap</button>
+            <button class="preset-chip" data-query="mechanical sympathy">mechanical sympathy</button>
+            <button class="preset-chip" data-query="porter stemmer">porter stemmer</button>
+          </div>
+        </div>
+
+        <!-- Split Terminal Body -->
+        <div class="terminal-split-body">
+          <!-- Left: Ranked Results Feed -->
+          <div class="terminal-results-pane">
+            <div class="pane-heading">
+              <span class="pane-title">Ranked BM25 Results</span>
+              <span id="results-count-badge" class="pane-badge">Sorted by Score</span>
+            </div>
+            <div id="repl-results-list" class="results-list">
+              <!-- Rendered via playground.js -->
+            </div>
+          </div>
+
+          <!-- Right: Engine Internals & Telemetry -->
+          <div class="terminal-telemetry-pane">
+            <div class="internals-block">
+              <div class="block-title">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+                <span>Analysis Stream (NFKD + Stopwords + Porter Stemmer)</span>
+              </div>
+              <div id="token-stream" class="token-pipeline-stream">
+                <span class="token-chip">distribut</span>
+                <span class="token-arrow">→</span>
+                <span class="token-chip">consensus</span>
+              </div>
+            </div>
+
+            <div class="internals-block">
+              <div class="block-title">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="16 18 22 12 16 6"/>
+                  <polyline points="8 6 2 12 8 18"/>
+                </svg>
+                <span>AST Query Evaluation Plan</span>
+              </div>
+              <pre id="ast-plan-pre" class="ast-tree-pre">BinaryOp(AND, [Term("distribut"), Term("consensus")])</pre>
+            </div>
+
+            <div class="internals-block">
+              <div class="block-title">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                </svg>
+                <span>Engine Telemetry</span>
+              </div>
+              <div class="telemetry-grid">
+                <div class="telemetry-item">
+                  <div class="telemetry-lbl">Candidates Scanned</div>
+                  <div id="telem-candidates" class="telemetry-val">10</div>
+                </div>
+                <div class="telemetry-item">
+                  <div class="telemetry-lbl">Terms Looked Up</div>
+                  <div id="telem-terms" class="telemetry-val">2</div>
+                </div>
+                <div class="telemetry-item">
+                  <div class="telemetry-lbl">WAND Pruned</div>
+                  <div id="telem-pruned" class="telemetry-val">0</div>
+                </div>
+                <div class="telemetry-item">
+                  <div class="telemetry-lbl">Avg Doc Length</div>
+                  <div id="telem-avgdl" class="telemetry-val">28 words</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- Document Inspector Modal -->
+  <div id="studio-modal-backdrop" class="studio-modal-backdrop">
+    <div class="studio-modal-box">
+      <div class="studio-modal-header">
+        <div>
+          <h3 id="modal-doc-title" style="font-size: 0.95rem; color: #ffffff; margin-bottom: 2px;">Document Details</h3>
+          <span id="modal-doc-sub" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent);">ID: #1</span>
+        </div>
+        <button id="modal-close-btn" class="clear-search-btn" style="display: block; font-size: 1.1rem; position: static;">✕</button>
+      </div>
+      <div id="modal-doc-body" class="studio-modal-body">
+        <!-- Rendered by playground.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Toast Notice -->
+  <div id="toast-notice" class="toast-notice">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+    <span id="toast-msg">Document indexed successfully!</span>
+  </div>
+
+  <!-- Interactive Studio Logic -->
+  <script src="playground.js"></script>
+</body>
+</html>
