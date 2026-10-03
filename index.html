@@ -20,6 +20,8 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="styles.css">
+  <!-- PDF Extraction Pipeline -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
@@ -194,7 +196,7 @@
             <button class="preset-chip" data-query="varint d-gap">varint d-gap</button>
             <button class="preset-chip" data-query="mechanical sympathy">mechanical sympathy</button>
             <button id="btn-demo-upload" class="preset-chip" style="border-color: var(--accent); color: var(--accent); background: var(--accent-subtle); display: inline-flex; align-items: center; gap: 5px;" title="Upload and search your local files in this REPL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload Files</button>
-            <input type="file" id="demo-file-input" multiple style="display: none;" accept=".txt,.md,.markdown,.json,.csv,.js,.ts,.tsx,.jsx,.py,.html,.css,.scss,.yml,.yaml,.sh,.sql,.log,.xml,.env">
+            <input type="file" id="demo-file-input" multiple style="display: none;" accept=".pdf,.docx,.pptx,.txt,.md,.markdown,.json,.csv,.js,.ts,.tsx,.jsx,.py,.html,.css,.scss,.yml,.yaml,.sh,.sql,.log,.xml,.env">
           </div>
         </div>
 

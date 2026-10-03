@@ -257,7 +257,102 @@ const INITIAL_DOCUMENTS = [
 ];
 
 // ============================================================================
-// 4. Intelligent Content Extractor & HTML Cleaner
+// 4. Binary Extractors (PDF & Office OpenXML)
+// ============================================================================
+if (typeof window !== "undefined" && window.pdfjsLib && !window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+}
+
+async function extractPdfText(file) {
+  if (typeof window !== "undefined" && !window.pdfjsLib) {
+    await new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+      script.onload = () => {
+        if (window.pdfjsLib) {
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+          resolve();
+        } else {
+          reject(new Error("PDF parser failed to initialize"));
+        }
+      };
+      script.onerror = () => reject(new Error("Could not load PDF extraction engine"));
+      document.head.appendChild(script);
+    });
+  }
+
+  if (window.pdfjsLib && !window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+  const loadingTask = window.pdfjsLib.getDocument({ data: arrayBuffer });
+  const pdf = await loadingTask.promise;
+  const pagesText = [];
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const content = await page.getTextContent();
+    const strings = content.items.map(item => item.str).filter(Boolean);
+    if (strings.length > 0) {
+      pagesText.push(`[Page ${pageNum}]\n` + strings.join(" "));
+    }
+  }
+
+  const full = pagesText.join("\n\n").trim();
+  if (!full) {
+    throw new Error("This PDF does not contain selectable text.");
+  }
+  return full;
+}
+
+async function extractDocxText(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const view = new DataView(arrayBuffer);
+  const bytes = new Uint8Array(arrayBuffer);
+  let pos = 0;
+  const texts = [];
+  const textDecoder = new TextDecoder();
+
+  while (pos < bytes.length - 30) {
+    if (view.getUint32(pos, true) === 0x04034b50) {
+      const method = view.getUint16(pos + 8, true);
+      const compSize = view.getUint32(pos + 18, true);
+      const nameLen = view.getUint16(pos + 26, true);
+      const extraLen = view.getUint16(pos + 28, true);
+      const nameBytes = bytes.subarray(pos + 30, pos + 30 + nameLen);
+      const name = textDecoder.decode(nameBytes);
+      const dataStart = pos + 30 + nameLen + extraLen;
+
+      if (/word\/document\.xml/i.test(name) || /ppt\/slides\/slide\d+\.xml/i.test(name)) {
+        const compressed = bytes.subarray(dataStart, dataStart + compSize);
+        try {
+          let xml = "";
+          if (method === 8 && typeof DecompressionStream !== "undefined") {
+            const ds = new DecompressionStream("deflate-raw");
+            const writer = ds.writable.getWriter();
+            writer.write(compressed);
+            writer.close();
+            xml = await new Response(ds.readable).text();
+          } else if (method === 0) {
+            xml = textDecoder.decode(compressed);
+          }
+          const clean = xml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+          if (clean.length > 0) texts.push(clean);
+        } catch (e) {
+          console.warn("Office XML decompression error:", e);
+        }
+      }
+      pos = dataStart + compSize;
+    } else {
+      pos++;
+    }
+  }
+  return texts.join("\n\n").trim();
+}
+
+// ============================================================================
+// 5. Intelligent Content Extractor & HTML Cleaner
 // ============================================================================
 function extractReadableDocument(rawContent, filename = "") {
   if (!rawContent || typeof rawContent !== "string") {
@@ -729,8 +824,30 @@ document.addEventListener('DOMContentLoaded', () => {
       let firstTerm = '';
       for (const file of files) {
         try {
-          const content = await file.text();
-          if (content.includes('\0')) continue;
+          const ext = file.name.split('.').pop().toLowerCase();
+          let content = '';
+
+          if (ext === 'pdf') {
+            try {
+              content = await extractPdfText(file);
+            } catch (pdfErr) {
+              console.warn('PDF extraction failed:', pdfErr);
+              continue;
+            }
+          } else if (ext === 'docx' || ext === 'pptx') {
+            try {
+              content = await extractDocxText(file);
+            } catch (docxErr) {
+              console.warn('Office extraction failed:', docxErr);
+              continue;
+            }
+          } else {
+            content = await file.text();
+            if (content.includes('\0')) continue;
+          }
+
+          if (!content || !content.trim()) continue;
+
           const extracted = extractReadableDocument(content, file.name);
           engine.addDocument({
             id: engine.documents.size + 1,

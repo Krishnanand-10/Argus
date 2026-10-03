@@ -17,6 +17,8 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="styles.css">
+  <!-- PDF Extraction Pipeline -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
@@ -101,7 +103,7 @@
         </svg>
         <div style="font-size: 0.84rem; font-weight: 600; color: #ffffff; margin-bottom: 2px;">Drop files or folder here</div>
         <div style="font-size: 0.72rem; color: #a1a1aa; margin-bottom: 12px; line-height: 1.4;">
-          Supports text, Markdown, codebases, JSON &amp; CSV
+          Supports PDF, Word, text, Markdown, code, JSON &amp; CSV
         </div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; width: 100%;">
           <button id="btn-browse-files" class="btn-studio-action" style="flex: 1; min-width: 110px; height: 32px; font-size: 0.74rem; margin: 0; padding: 0 10px;">
@@ -116,9 +118,10 @@
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
             </svg>
             <span>Choose Folder...</span>
+          </button>
         </div>
 
-        <input type="file" id="local-file-input" multiple style="display: none;">
+        <input type="file" id="local-file-input" multiple style="display: none;" accept=".pdf,.docx,.pptx,.txt,.md,.markdown,.json,.csv,.tsv,.js,.ts,.tsx,.jsx,.py,.html,.css,.scss,.yml,.yaml,.toml,.sh,.bash,.zsh,.sql,.log,.xml,.env">
         <input type="file" id="local-folder-input" webkitdirectory directory multiple style="display: none;">
       </div>
 
