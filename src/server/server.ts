@@ -99,7 +99,7 @@ export class ArgusServer {
       '/playground.js': 'playground.js',
     };
 
-    if (method === 'GET' && staticRoutes[pathname]) {
+    if ((method === 'GET' || method === 'HEAD') && staticRoutes[pathname]) {
       const fileName = staticRoutes[pathname];
       const candidates = [
         path.resolve(process.cwd(), fileName),
@@ -116,7 +116,11 @@ export class ArgusServer {
             '.js': 'application/javascript; charset=utf-8',
           };
           res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'text/plain' });
-          res.end(fs.readFileSync(candidate));
+          if (method === 'HEAD') {
+            res.end();
+          } else {
+            res.end(fs.readFileSync(candidate));
+          }
           return;
         }
       }
@@ -221,6 +225,30 @@ export class ArgusServer {
                   body: file.content,
                 });
               }
+            } else if (ext === '.html' || ext === '.htm' || /^\s*<!doctype\s+html/i.test(file.content)) {
+              let title = file.name;
+              const titleMatch = file.content.match(/<title[^>]*>([^<]+)<\/title>/i);
+              if (titleMatch && titleMatch[1] && titleMatch[1].trim()) {
+                title = titleMatch[1].trim();
+              }
+              const noStyle = file.content.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+              const noScript = noStyle.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+              const cleanBody = noScript
+                .replace(/<(h[1-6]|section)[^>]*>/gi, '\n\n### ')
+                .replace(/<li[^>]*>/gi, '\n• ')
+                .replace(/<(p|div|article|tr|table|header|footer|blockquote)[^>]*>/gi, '\n')
+                .replace(/<[^>]+>/g, ' ')
+                .split('\n')
+                .map((l: string) => l.trim())
+                .filter((l: string, idx: number, arr: string[]) => l.length > 0 || (idx > 0 && Boolean(arr[idx - 1] && arr[idx - 1]!.length > 0)))
+                .join('\n')
+                .trim();
+
+              documentsToIndex.push({
+                id: nextId++,
+                title,
+                body: cleanBody || file.content,
+              });
             } else {
               documentsToIndex.push({
                 id: nextId++,

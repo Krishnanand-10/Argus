@@ -426,11 +426,18 @@
   <div id="studio-modal-backdrop" class="studio-modal-backdrop">
     <div class="studio-modal-box">
       <div class="studio-modal-header">
-        <div>
-          <h3 id="modal-doc-title" style="font-size: 0.95rem; color: #ffffff; margin-bottom: 2px;">Document Details</h3>
-          <span id="modal-doc-sub" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent);">ID: #1</span>
+        <div style="flex: 1; min-width: 0; padding-right: 12px;">
+          <h3 id="modal-doc-title" style="font-size: 0.96rem; color: #ffffff; margin-bottom: 3px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Document Details</h3>
+          <div id="modal-doc-sub" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">ID: #1</div>
         </div>
-        <button id="modal-close-btn" class="clear-search-btn" style="display: block; font-size: 1.1rem; position: static;">✕</button>
+        <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+          <div class="modal-segmented-control">
+            <button id="modal-btn-formatted" class="modal-tab-btn active" title="Clean formatted reading view">📖 Reading View</button>
+            <button id="modal-btn-raw" class="modal-tab-btn" title="View raw file source code">💻 Raw Source</button>
+          </div>
+          <button id="modal-copy-btn" class="btn-studio-secondary" style="height: 28px; padding: 0 10px; font-size: 0.7rem;" title="Copy content to clipboard">📋 Copy</button>
+          <button id="modal-close-btn" class="clear-search-btn" style="display: block; font-size: 1.1rem; position: static;">✕</button>
+        </div>
       </div>
       <div id="modal-doc-body" class="studio-modal-body">
         <!-- Rendered by playground.js -->

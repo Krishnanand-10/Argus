@@ -257,7 +257,84 @@ const INITIAL_DOCUMENTS = [
 ];
 
 // ============================================================================
-// 4. In-Memory Search Engine Implementation
+// 4. Intelligent Content Extractor & HTML Cleaner
+// ============================================================================
+function extractReadableDocument(rawContent, filename = "") {
+  if (!rawContent || typeof rawContent !== "string") {
+    return { title: filename || "Untitled Document", body: "", rawContent: "", docType: "Text Document" };
+  }
+
+  const isHtml = /\.html?$/i.test(filename) || /^\s*<!doctype\s+html/i.test(rawContent) || /<html[\s>]/i.test(rawContent);
+
+  if (isHtml) {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(rawContent, "text/html");
+
+      let title = "";
+      if (doc.title && doc.title.trim()) {
+        title = doc.title.trim();
+      } else {
+        const h1 = doc.querySelector("h1, h2, .title, .title-slide, header");
+        if (h1 && h1.textContent.trim()) {
+          title = h1.textContent.trim().split("\n")[0].trim();
+        }
+      }
+      if (!title) title = filename || "HTML Document";
+
+      const junk = doc.querySelectorAll("style, script, noscript, svg, link, iframe, meta, button.theme-toggle");
+      junk.forEach(el => el.remove());
+
+      function extractBlocks(element) {
+        if (!element) return "";
+        let out = "";
+        for (const child of element.childNodes) {
+          if (child.nodeType === Node.TEXT_NODE) {
+            const val = child.nodeValue.replace(/[\r\n\t]+/g, " ");
+            if (val.trim()) out += val;
+          } else if (child.nodeType === Node.ELEMENT_NODE) {
+            const tag = child.tagName.toLowerCase();
+            const isHeading = /^h[1-6]$/.test(tag);
+            const isSection = tag === "section" || (child.classList && child.classList.contains("slide"));
+            const isBlock = /^(p|div|section|article|li|ol|ul|tr|table|header|footer|blockquote|main)$/.test(tag);
+
+            if (isSection || isHeading) out += "\n\n### ";
+            else if (tag === "li") out += "\n• ";
+            else if (isBlock) out += "\n";
+
+            out += extractBlocks(child);
+
+            if (isSection || isHeading || isBlock) out += "\n";
+          }
+        }
+        return out;
+      }
+
+      let cleanBody = extractBlocks(doc.body || doc.documentElement);
+      cleanBody = cleanBody
+        .split("\n")
+        .map(l => l.trim())
+        .filter((l, idx, arr) => l.length > 0 || (idx > 0 && arr[idx - 1].length > 0))
+        .join("\n")
+        .trim();
+
+      return {
+        title,
+        body: cleanBody || rawContent,
+        rawContent,
+        docType: "HTML Document"
+      };
+    } catch {
+      const clean = rawContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "").replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      return { title: filename || "HTML Document", body: clean, rawContent, docType: "HTML Document" };
+    }
+  }
+
+  return { title: filename || "Document", body: rawContent, rawContent, docType: "Text Document" };
+}
+
+// ============================================================================
+// 5. In-Memory Search Engine Implementation
 // ============================================================================
 class MiniArgusEngine {
   constructor(documents = INITIAL_DOCUMENTS) {
@@ -276,11 +353,22 @@ class MiniArgusEngine {
   }
 
   addDocument(doc) {
-    this.documents.set(doc.id, doc);
-    const text = `${doc.title} ${doc.body}`;
+    const fileName = doc.fileName || doc.title || "";
+    const extracted = extractReadableDocument(doc.body || "", fileName);
+    const finalTitle = doc.title && doc.title !== fileName ? doc.title : (extracted.title || fileName || "Untitled Document");
+    const cleanDoc = {
+      ...doc,
+      title: finalTitle,
+      body: extracted.body,
+      rawContent: doc.rawContent || doc.body,
+      docType: extracted.docType
+    };
+
+    this.documents.set(cleanDoc.id, cleanDoc);
+    const text = `${cleanDoc.title} ${cleanDoc.body}`;
     const tokens = tokenize(text);
     
-    this.docLengths.set(doc.id, tokens.length);
+    this.docLengths.set(cleanDoc.id, tokens.length);
     this.totalDocLength += tokens.length;
 
     // Build positional postings
@@ -441,7 +529,9 @@ class MiniArgusEngine {
   }
 
   generateSnippet(body, stems) {
-    const words = body.split(/\s+/);
+    if (!body) return "";
+    const cleanBody = body.replace(/###\s+/g, "").replace(/•\s+/g, "");
+    const words = cleanBody.split(/\s+/);
     let bestIdx = 0;
 
     for (let i = 0; i < words.length; i++) {

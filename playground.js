@@ -197,7 +197,159 @@ function tokenize(text) {
 }
 
 // ============================================================================
-// 4. In-Memory Search Engine
+// 4. Intelligent Content Extractor & HTML Cleaner
+// ============================================================================
+function extractReadableDocument(rawContent, filename = "") {
+  if (!rawContent || typeof rawContent !== "string") {
+    return {
+      title: filename || "Untitled Document",
+      body: "",
+      rawContent: "",
+      docType: "Text Document",
+      isHtml: false
+    };
+  }
+
+  const isHtml = /\.html?$/i.test(filename) || 
+                 /^\s*<!doctype\s+html/i.test(rawContent) || 
+                 /<html[\s>]/i.test(rawContent) ||
+                 /<head[\s>]/i.test(rawContent) ||
+                 /<body[\s>]/i.test(rawContent);
+
+  if (isHtml) {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(rawContent, "text/html");
+
+      // Extract title from <title> tag, or first <h1>/<h2>, or filename
+      let title = "";
+      if (doc.title && doc.title.trim()) {
+        title = doc.title.trim();
+      } else {
+        const h1 = doc.querySelector("h1, h2, .title, .title-slide, header");
+        if (h1 && h1.textContent.trim()) {
+          title = h1.textContent.trim().split("\n")[0].trim();
+        }
+      }
+      if (!title) title = filename || "HTML Document";
+
+      // Detect presentation vs general HTML
+      const isPresentation = doc.querySelector(".reveal, .slides, .presentation, .slide") !== null ||
+                             rawContent.includes("reveal.js") || 
+                             rawContent.includes("class=\"slides\"");
+
+      // Remove non-content tags: style, script, noscript, svg, link, iframe, meta
+      const junk = doc.querySelectorAll("style, script, noscript, svg, link, iframe, meta, button.theme-toggle");
+      junk.forEach(el => el.remove());
+
+      // Extract structured content preserving sections, slides, headers, and lists
+      function extractBlocks(element) {
+        if (!element) return "";
+        let out = "";
+        for (const child of element.childNodes) {
+          if (child.nodeType === Node.TEXT_NODE) {
+            const val = child.nodeValue.replace(/[\r\n\t]+/g, " ");
+            if (val.trim()) out += val;
+          } else if (child.nodeType === Node.ELEMENT_NODE) {
+            const tag = child.tagName.toLowerCase();
+            const isHeading = /^h[1-6]$/.test(tag);
+            const isSection = tag === "section" || (child.classList && child.classList.contains("slide"));
+            const isBlock = /^(p|div|section|article|li|ol|ul|tr|table|header|footer|blockquote|main)$/.test(tag);
+
+            if (isSection) out += "\n\n### ";
+            else if (isHeading) out += "\n\n### ";
+            else if (tag === "li") out += "\n• ";
+            else if (isBlock) out += "\n";
+
+            out += extractBlocks(child);
+
+            if (isSection || isHeading || isBlock) out += "\n";
+          }
+        }
+        return out;
+      }
+
+      let cleanBody = extractBlocks(doc.body || doc.documentElement);
+      // Clean up multiple spaces, consecutive newlines, and strip accidental ### with nothing after
+      cleanBody = cleanBody
+        .split("\n")
+        .map(l => l.trim())
+        .filter((l, idx, arr) => {
+          if (l === "###") return false;
+          if (l.length === 0 && idx > 0 && arr[idx - 1].length === 0) return false;
+          return true;
+        })
+        .join("\n")
+        .trim();
+
+      return {
+        title,
+        body: cleanBody || rawContent,
+        rawContent,
+        docType: isPresentation ? "HTML Presentation" : "HTML Document",
+        isHtml: true
+      };
+    } catch (e) {
+      console.warn("DOMParser failed, falling back to regex stripper:", e);
+      const noStyle = rawContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
+      const noScript = noStyle.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "");
+      const clean = noScript.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      return {
+        title: filename || "HTML Document",
+        body: clean,
+        rawContent,
+        docType: "HTML Document",
+        isHtml: true
+      };
+    }
+  }
+
+  // Handle JSON files
+  if (/\.json$/i.test(filename) || (rawContent.trim().startsWith("{") || rawContent.trim().startsWith("["))) {
+    try {
+      const parsed = JSON.parse(rawContent);
+      let extractedText = "";
+      if (Array.isArray(parsed)) {
+        extractedText = parsed.map(item => {
+          if (typeof item === "string") return item;
+          return Object.values(item).filter(v => typeof v === "string").join(" — ");
+        }).join("\n\n");
+      } else if (typeof parsed === "object" && parsed !== null) {
+        extractedText = Object.entries(parsed).map(([k, v]) => {
+          return `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`;
+        }).join("\n");
+      }
+      return {
+        title: filename || "JSON Data",
+        body: extractedText || rawContent,
+        rawContent,
+        docType: "JSON Data",
+        isHtml: false
+      };
+    } catch {
+      // Not valid JSON, continue to text
+    }
+  }
+
+  // Markdown or plain text
+  const isMd = /\.md$/i.test(filename);
+  let title = filename || "Text Document";
+  if (isMd) {
+    const firstH1 = rawContent.match(/^#\s+(.+)$/m);
+    if (firstH1) title = firstH1[1].trim();
+  }
+
+  return {
+    title,
+    body: rawContent,
+    rawContent,
+    docType: isMd ? "Markdown" : "Text Document",
+    isHtml: false
+  };
+}
+
+// ============================================================================
+// 5. In-Memory Search Engine
 // ============================================================================
 class StudioEngine {
   constructor(docs = []) {
@@ -217,16 +369,25 @@ class StudioEngine {
     const docId = typeof doc.id === "number" ? doc.id : this.getNextDocId();
     const isFile = !!doc.isFile;
     const isNote = doc.isNote !== undefined ? !!doc.isNote : !isFile;
+    const fileName = doc.fileName || (isFile ? doc.title : "") || "";
+
+    // Extract clean readable content for indexing and reading view
+    const extracted = extractReadableDocument(doc.body || "", fileName || doc.title || "");
+    const finalTitle = doc.title && doc.title !== fileName ? doc.title : (extracted.title || fileName || "Untitled Document");
+
     const storedDoc = {
       id: docId,
-      title: doc.title || "Untitled Document",
-      path: doc.path || (isFile ? `files/${doc.fileName || 'file-' + docId}` : `notes/doc-${docId}.md`),
-      body: doc.body || "",
+      title: finalTitle,
+      path: doc.path || (isFile ? `files/${fileName || 'file-' + docId}` : `notes/note-${docId}.md`),
+      body: extracted.body,
+      rawContent: doc.rawContent || doc.body || "",
       isPersonal: true,
       isFile: isFile,
       isNote: isNote,
+      docType: extracted.docType,
+      isHtml: extracted.isHtml,
       fileSize: doc.fileSize || 0,
-      fileName: doc.fileName || doc.title || ""
+      fileName: fileName || finalTitle
     };
 
     if (this.documents.has(docId)) {
@@ -401,9 +562,12 @@ class StudioEngine {
         docId: doc.id,
         title: doc.title,
         path: doc.path,
+        fileName: doc.fileName || "",
+        docType: doc.docType || "Text Document",
         isPersonal: true,
         isFile: !!doc.isFile,
         isNote: !!doc.isNote,
+        isHtml: !!doc.isHtml,
         fileSize: doc.fileSize || 0,
         score: +item.score.toFixed(2),
         snippet: this.generateSnippet(doc.body, stems),
@@ -427,7 +591,9 @@ class StudioEngine {
   }
 
   generateSnippet(body, stems) {
-    const words = body.split(/\s+/);
+    if (!body) return "";
+    const cleanBody = body.replace(/###\s+/g, "").replace(/•\s+/g, "");
+    const words = cleanBody.split(/\s+/);
     let bestIdx = 0;
 
     for (let i = 0; i < words.length; i++) {
@@ -533,6 +699,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const modalDocTitle = document.getElementById("modal-doc-title");
   const modalDocSub = document.getElementById("modal-doc-sub");
   const modalDocBody = document.getElementById("modal-doc-body");
+  const modalBtnFormatted = document.getElementById("modal-btn-formatted");
+  const modalBtnRaw = document.getElementById("modal-btn-raw");
+  const modalCopyBtn = document.getElementById("modal-copy-btn");
+  let activeModalDocId = null;
+  let currentModalViewMode = "formatted"; // 'formatted' | 'raw'
 
   // Toast
   const toastNotice = document.getElementById("toast-notice");
@@ -654,9 +825,11 @@ document.addEventListener("DOMContentLoaded", () => {
         ? res.matchedStems.map(s => `<span class="matched-term-tag">${escapeHtml(s)}</span>`).join("")
         : "";
 
-      const typeBadge = res.isFile
-        ? `<span class="file-pill-badge" title="Indexed from uploaded file">📁 File</span>`
-        : `<span class="file-pill-badge" style="border-color: rgba(168, 85, 247, 0.4); color: #c084fc; background: rgba(168, 85, 247, 0.08);" title="Custom text note">📝 Note</span>`;
+      const typeLabel = res.docType || (res.isFile ? "File" : "Note");
+      const typeBadge = `<span class="file-pill-badge" title="${escapeHtml(typeLabel)}">${res.isFile ? '📁 ' : '📝 '}${escapeHtml(typeLabel)}</span>`;
+      const fileSub = res.fileName && res.fileName !== res.title
+        ? `<span style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-dim); margin-left: 6px;">(${escapeHtml(res.fileName)})</span>`
+        : "";
 
       return `
         <article class="result-card" data-doc-id="${res.docId}">
@@ -664,7 +837,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <span class="result-rank-num">#${idx + 1}</span>
             <div style="flex: 1; min-width: 0;">
               <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px; flex-wrap: wrap;">
-                <h3 class="result-title">${escapeHtml(res.title)}</h3>
+                <h3 class="result-title">${escapeHtml(res.title)}${fileSub}</h3>
                 ${typeBadge}
               </div>
               <div class="result-path">${escapeHtml(res.path)}</div>
@@ -957,27 +1130,130 @@ document.addEventListener("DOMContentLoaded", () => {
   function openDocumentModal(docId) {
     const doc = engine.documents.get(docId);
     if (!doc) return;
+    activeModalDocId = docId;
 
     modalDocTitle.textContent = doc.title;
-    const typeTag = doc.isFile ? " · Uploaded File" : " · Text Note";
-    modalDocSub.textContent = `Document ID: #${doc.id} · ${doc.path} · ${engine.docLengths.get(doc.id) || 0} indexed terms${typeTag}`;
+    const fileLabel = doc.fileName && doc.fileName !== doc.title ? ` · <span>${escapeHtml(doc.fileName)}</span>` : "";
+    const typeLabel = doc.docType || (doc.isFile ? "Uploaded File" : "Text Note");
+    const termCount = engine.docLengths.get(doc.id) || 0;
+    const words = doc.body ? doc.body.trim().split(/\s+/).length : 0;
 
+    modalDocSub.innerHTML = `
+      <span>Doc #${doc.id}</span>
+      <span>•</span>
+      <span>${escapeHtml(doc.path)}</span>
+      ${fileLabel}
+      <span>•</span>
+      <span style="color: var(--accent);">${words} words</span>
+      <span>•</span>
+      <span>${termCount} indexed terms</span>
+      <span>•</span>
+      <span class="file-pill-badge" style="font-size:0.62rem; padding: 1px 6px;">${escapeHtml(typeLabel)}</span>
+    `;
+
+    renderModalContent(doc);
+    modalBackdrop.classList.add("open");
+  }
+
+  function renderModalContent(doc) {
+    if (!doc) return;
+
+    if (currentModalViewMode === "raw") {
+      const raw = doc.rawContent || doc.body;
+      modalDocBody.innerHTML = `<pre class="modal-raw-pre"><code>${escapeHtml(raw)}</code></pre>`;
+      return;
+    }
+
+    // Formatted Clean Reading View
     const q = searchInput.value.trim();
     const tokens = tokenize(q.replace(/"/g, ""));
     const stems = tokens.map(t => t.stem);
 
-    const words = doc.body.split(/\s+/);
-    const highlighted = words.map(w => {
+    modalDocBody.innerHTML = formatDocumentContent(doc.body, stems);
+  }
+
+  function highlightTermsInText(str, stems) {
+    if (!str) return "";
+    const words = str.split(/(\s+)/);
+    return words.map(w => {
+      if (/^\s+$/.test(w)) return w;
       const clean = w.toLowerCase().replace(/[^\w]/g, "");
       const s = PorterStemmer(clean);
-      if (stems.includes(s)) {
+      if (stems && stems.length > 0 && stems.includes(s)) {
         return `<mark>${escapeHtml(w)}</mark>`;
       }
       return escapeHtml(w);
-    }).join(" ");
+    }).join("");
+  }
 
-    modalDocBody.innerHTML = highlighted;
-    modalBackdrop.classList.add("open");
+  function formatDocumentContent(text, stems) {
+    if (!text) return '<div style="color: var(--text-dim); text-align: center; padding: 20px;">Empty document content</div>';
+
+    const lines = text.split("\n");
+    let html = "";
+    let inList = false;
+
+    for (let rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) {
+        if (inList) { html += "</ul>"; inList = false; }
+        continue;
+      }
+
+      if (line.startsWith("### ")) {
+        if (inList) { html += "</ul>"; inList = false; }
+        const hText = highlightTermsInText(line.replace(/^###\s+/, ""), stems);
+        html += `<h4 class="modal-content-h4">${hText}</h4>`;
+      } else if (line.startsWith("• ")) {
+        if (!inList) { html += '<ul class="modal-content-list">'; inList = true; }
+        const liText = highlightTermsInText(line.replace(/^•\s+/, ""), stems);
+        html += `<li>${liText}</li>`;
+      } else {
+        if (inList) { html += "</ul>"; inList = false; }
+        const pText = highlightTermsInText(line, stems);
+        html += `<p class="modal-content-p">${pText}</p>`;
+      }
+    }
+
+    if (inList) html += "</ul>";
+    return html;
+  }
+
+  // Modal View Toggle & Actions
+  if (modalBtnFormatted) {
+    modalBtnFormatted.addEventListener("click", () => {
+      currentModalViewMode = "formatted";
+      modalBtnFormatted.classList.add("active");
+      if (modalBtnRaw) modalBtnRaw.classList.remove("active");
+      if (activeModalDocId !== null) {
+        renderModalContent(engine.documents.get(activeModalDocId));
+      }
+    });
+  }
+
+  if (modalBtnRaw) {
+    modalBtnRaw.addEventListener("click", () => {
+      currentModalViewMode = "raw";
+      modalBtnRaw.classList.add("active");
+      if (modalBtnFormatted) modalBtnFormatted.classList.remove("active");
+      if (activeModalDocId !== null) {
+        renderModalContent(engine.documents.get(activeModalDocId));
+      }
+    });
+  }
+
+  if (modalCopyBtn) {
+    modalCopyBtn.addEventListener("click", () => {
+      if (activeModalDocId === null) return;
+      const doc = engine.documents.get(activeModalDocId);
+      if (!doc) return;
+      const textToCopy = currentModalViewMode === "raw" ? (doc.rawContent || doc.body) : doc.body;
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        showToast("Copied document content to clipboard!");
+      }).catch(() => {
+        showToast("Failed copying to clipboard");
+      });
+    });
   }
 
   modalCloseBtn.addEventListener("click", () => {
