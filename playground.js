@@ -1486,9 +1486,9 @@ document.addEventListener("DOMContentLoaded", () => {
           <div>No indexed documents match <code>"${escapeHtml(query)}"</code></div>
           <p style="margin-top: 6px; font-size: 0.74rem; color: var(--text-dim);">
             ${activeCorpusFilter === "files" 
-              ? "No matches found in uploaded files. Drop more files or switch filter to 'All Documents'!" 
+              ? "No matches found in uploaded files. Drop more files or switch filter to 'Total Documents'!" 
               : activeCorpusFilter === "notes"
-              ? "No matches found in text notes. Switch filter to 'All Documents' or add more text!"
+              ? "No matches found in text notes. Switch filter to 'Total Documents' or add more text!"
               : "Try different search terms, exact phrases, or index additional documents!"}
           </p>
         </div>
