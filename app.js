@@ -293,9 +293,33 @@ async function extractPdfText(file) {
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
     const content = await page.getTextContent();
-    const strings = content.items.map(item => item.str).filter(Boolean);
-    if (strings.length > 0) {
-      pagesText.push(`[Page ${pageNum}]\n` + strings.join(" "));
+    let pageStr = "";
+    let lastY = null;
+
+    for (const item of content.items) {
+      if (!item.str) continue;
+      const text = item.str;
+      const y = item.transform ? item.transform[5] : null;
+
+      if (lastY !== null && y !== null) {
+        const yDiff = Math.abs(y - lastY);
+        if (yDiff > 14) {
+          pageStr += "\n\n";
+        } else if (yDiff > 3 || item.hasEOL) {
+          pageStr += "\n";
+        } else {
+          if (pageStr && !pageStr.endsWith(" ") && !pageStr.endsWith("\n")) {
+            pageStr += " ";
+          }
+        }
+      }
+
+      pageStr += text;
+      lastY = y;
+    }
+
+    if (pageStr.trim()) {
+      pagesText.push(`### Page ${pageNum}\n\n` + pageStr.trim());
     }
   }
 

@@ -233,9 +233,36 @@ async function extractPdfText(file) {
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
     const content = await page.getTextContent();
-    const strings = content.items.map(item => item.str).filter(Boolean);
-    if (strings.length > 0) {
-      pagesText.push(`[Page ${pageNum}]\n` + strings.join(" "));
+    let pageStr = "";
+    let lastY = null;
+
+    for (const item of content.items) {
+      if (!item.str) continue;
+      const text = item.str;
+      const y = item.transform ? item.transform[5] : null;
+
+      if (lastY !== null && y !== null) {
+        const yDiff = Math.abs(y - lastY);
+        if (yDiff > 14) {
+          // Paragraph break or section break
+          pageStr += "\n\n";
+        } else if (yDiff > 3 || item.hasEOL) {
+          // Line break
+          pageStr += "\n";
+        } else {
+          // Word spacing on same line
+          if (pageStr && !pageStr.endsWith(" ") && !pageStr.endsWith("\n")) {
+            pageStr += " ";
+          }
+        }
+      }
+
+      pageStr += text;
+      lastY = y;
+    }
+
+    if (pageStr.trim()) {
+      pagesText.push(`### Page ${pageNum}\n\n` + pageStr.trim());
     }
   }
 
@@ -1940,18 +1967,11 @@ document.addEventListener("DOMContentLoaded", () => {
       ${queryPill}
     `;
 
-    // Default to 'excerpts' view if there is an active search query and excerpts button exists
-    if (q && modalBtnExcerpts) {
-      currentModalViewMode = "excerpts";
-      modalBtnExcerpts.classList.add("active");
-      if (modalBtnFormatted) modalBtnFormatted.classList.remove("active");
-      if (modalBtnRaw) modalBtnRaw.classList.remove("active");
-    } else {
-      currentModalViewMode = "formatted";
-      if (modalBtnFormatted) modalBtnFormatted.classList.add("active");
-      if (modalBtnExcerpts) modalBtnExcerpts.classList.remove("active");
-      if (modalBtnRaw) modalBtnRaw.classList.remove("active");
-    }
+    // Default to 'formatted' (Reading View) so user sees the full formatted document with highlighted matches!
+    currentModalViewMode = "formatted";
+    if (modalBtnFormatted) modalBtnFormatted.classList.add("active");
+    if (modalBtnExcerpts) modalBtnExcerpts.classList.remove("active");
+    if (modalBtnRaw) modalBtnRaw.classList.remove("active");
 
     renderModalContent(doc);
     modalBackdrop.classList.add("open");
