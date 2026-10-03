@@ -1,7 +1,12 @@
 import * as http from 'node:http';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import type { ArgusEngine } from '../engine.js';
 import type { IndexableDocument } from '../index/types.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export interface ServerOptions {
   port?: number;
@@ -82,11 +87,34 @@ export class ArgusServer {
       return;
     }
 
-    // Route: GET / -> Embedded Search Playground UI
-    if (method === 'GET' && pathname === '/') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(this.renderSearchUI());
-      return;
+    // Route: Static files (index.html, styles.css, app.js) or fallback UI
+    if (method === 'GET' && (pathname === '/' || pathname === '/index.html' || pathname === '/styles.css' || pathname === '/app.js')) {
+      const fileName = pathname === '/' ? 'index.html' : pathname.slice(1);
+      const candidates = [
+        path.resolve(process.cwd(), fileName),
+        path.resolve(__dirname, '../../', fileName),
+        path.resolve(__dirname, '../', fileName),
+      ];
+
+      for (const candidate of candidates) {
+        if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+          const ext = path.extname(candidate).toLowerCase();
+          const mimeTypes: Record<string, string> = {
+            '.html': 'text/html; charset=utf-8',
+            '.css': 'text/css; charset=utf-8',
+            '.js': 'application/javascript; charset=utf-8',
+          };
+          res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'text/plain' });
+          res.end(fs.readFileSync(candidate));
+          return;
+        }
+      }
+
+      if (pathname === '/' || pathname === '/index.html') {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(this.renderSearchUI());
+        return;
+      }
     }
 
     // Route: GET /api/search?q=...&limit=...

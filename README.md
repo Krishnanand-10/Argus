@@ -6,7 +6,7 @@
 [![Vitest](https://img.shields.io/badge/Vitest-Automated_Tests-FCC72B?style=for-the-badge&logo=vitest&logoColor=black)](https://vitest.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
-> **A zero-dependency, memory-efficient full-text search engine engineered from first principles in pure TypeScript.**
+> **Full-text search at in-memory speed. Zero dependencies.**
 
 **Argus** is an embeddable, production-ready search engine designed with mechanical sympathy for the V8 runtime. Built with zero external dependencies, Argus combines an **in-memory positional inverted index**, **Variable-Byte (Varint) + Delta (d-gap) binary disk compression**, **Okapi BM25 relevance scoring**, and an **AST-based boolean & phrase query execution engine** capable of sub-10ms retrieval across 100,000+ documents.
 

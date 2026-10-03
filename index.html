@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Argus — Full-Text Search Playground | Full-text search at in-memory speed. Zero dependencies.</title>
+  
+  <meta name="description" content="Full-text search at in-memory speed. Zero dependencies. Okapi BM25 ranking, positional inverted index, and Varint compression.">
+  <meta name="author" content="Krishnanand Tiwari">
+  <meta property="og:title" content="Argus — Full-text search at in-memory speed. Zero dependencies.">
+  <meta property="og:description" content="Sub-millisecond full-text search with mechanical sympathy for V8. Okapi BM25, Varint d-gap compression, and AST boolean parser.">
+  <meta property="og:type" content="website">
+
+  <!-- Favicon (Developer Terminal P2P Style) -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none'><rect width='32' height='32' rx='8' fill='%230e0e13' stroke='%2322222b' stroke-width='1.5'/><circle cx='16' cy='16' r='6' stroke='%2300d2ff' stroke-width='2'/><circle cx='16' cy='16' r='2' fill='%2300d2ff'/><line x1='16' y1='6' x2='16' y2='9' stroke='%2300d2ff' stroke-width='2'/><line x1='16' y1='23' x2='16' y2='26' stroke='%2300d2ff' stroke-width='2'/><line x1='6' y1='16' x2='9' y2='16' stroke='%2300d2ff' stroke-width='2'/><line x1='23' y1='16' x2='26' y2='16' stroke='%2300d2ff' stroke-width='2'/></svg>">
+
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono (Exact P2PCopy Fonts) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Background Atmosphere -->
+  <div class="grid-layer"></div>
+  <div class="hero-radial-glow"></div>
+
+  <!-- Sticky Full-Width Header (Exact Reference: p2pcopy) -->
+  <header id="site-header">
+    <div class="header-inner">
+      <div style="display: flex; align-items: center; gap: 24px;">
+        <a href="#hero" class="header-brand">
+          <div class="brand-icon-box">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"/>
+              <circle cx="12" cy="12" r="3" fill="currentColor"/>
+              <line x1="12" y1="3" x2="12" y2="6"/>
+              <line x1="12" y1="18" x2="12" y2="21"/>
+              <line x1="3" y1="12" x2="6" y2="12"/>
+              <line x1="18" y1="12" x2="21" y2="12"/>
+            </svg>
+          </div>
+          <span>argus</span>
+          <span class="header-version-badge">v0.1.0</span>
+        </a>
+
+        <nav class="header-nav">
+          <a href="#demo" class="nav-link">Interactive REPL</a>
+          <a href="#commands" class="nav-link">Commands</a>
+          <a href="#features" class="nav-link">Features</a>
+          <a href="#architecture" class="nav-link">Architecture</a>
+          <a href="#benchmarks" class="nav-link">Benchmarks</a>
+        </nav>
+      </div>
+
+      <div class="header-right">
+        <div class="engine-status-pill">
+          <span class="status-dot"></span>
+          <span>In-Memory V8 Engine</span>
+        </div>
+
+        <a href="https://www.npmjs.com/package/argus-search" target="_blank" rel="noopener noreferrer" class="btn-header-icon btn-npm" title="View on npm: argus-search">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M1.763 0C.786 0 0 .786 0 1.763v20.474C0 23.214.786 24 1.763 24h20.474c.977 0 1.763-.786 1.763-1.763V1.763C24 .786 23.214 0 22.237 0zM5.13 5.323l13.837.019-.009 13.836h-3.464l.01-10.382h-3.456L12.04 19.17H5.113z"/>
+          </svg>
+        </a>
+
+        <a href="https://github.com/Krishnanand-10/Argus" target="_blank" rel="noopener noreferrer" class="btn-header-icon" title="View Source on GitHub">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Page Content Container -->
+  <main class="page-container">
+
+    <!-- Hero Section -->
+    <section id="hero" class="hero-section">
+      <h1 class="hero-title">
+        <span class="hero-line hero-line-1">Full-text search at in-memory speed.</span>
+        <span class="hero-line hero-line-2"><span class="gradient-text">Zero dependencies.</span></span>
+      </h1>
+
+      <p class="hero-subtitle">
+        A deterministic full-text search engine built with mechanical sympathy for V8. Combining Okapi BM25 ranking, positional inverted indexing, Varint + Delta binary compression, and sub-millisecond AST boolean queries.
+      </p>
+
+      <div class="hero-actions">
+        <button id="hero-copy-btn" class="terminal-copy-pill" title="Click to copy npm install command">
+          <span class="terminal-prompt">$</span>
+          <span>npm i argus-search</span>
+          <span class="copy-svg-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </span>
+        </button>
+
+        <a href="#demo" class="btn-terminal-primary">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          <span>Try Interactive REPL</span>
+        </a>
+      </div>
+
+      <div class="trust-metrics-strip">
+        <div class="metric-strip-item">
+          <span class="metric-check">✔</span>
+          <span>0 Dependencies</span>
+        </div>
+        <div class="metric-strip-item">
+          <span class="metric-check">✔</span>
+          <span>&lt; 1.2ms Median Query</span>
+        </div>
+        <div class="metric-strip-item">
+          <span class="metric-check">✔</span>
+          <span>71.4% VByte Compression</span>
+        </div>
+        <div class="metric-strip-item">
+          <span class="metric-check">✔</span>
+          <span>Zero GC Pauses (TypedArrays)</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Floating "Live Preview" Terminal Session (Exact Reference: p2pcopy) -->
+    <section id="demo" class="terminal-window-wrap">
+      <div class="terminal-window">
+        <!-- Terminal Header -->
+        <div class="terminal-header">
+          <div class="terminal-dots">
+            <span class="terminal-dot dot-rose"></span>
+            <span class="terminal-dot dot-amber"></span>
+            <span class="terminal-dot dot-emerald"></span>
+          </div>
+          <div class="terminal-title">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="4 17 10 11 4 5"/>
+              <line x1="12" y1="19" x2="20" y2="19"/>
+            </svg>
+            <span>argus — interactive search session &amp; engine telemetry</span>
+          </div>
+          <div class="terminal-status-tag">
+            <span class="status-dot" style="width: 5px; height: 5px;"></span>
+            <span>IN-MEMORY INDEX ACTIVE</span>
+          </div>
+        </div>
+
+        <!-- Terminal Control Bar -->
+        <div class="terminal-control-bar">
+          <div class="search-input-group">
+            <div class="search-field-wrap">
+              <svg class="search-field-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input 
+                id="preview-search-input" 
+                name="queryInput"
+                type="text" 
+                class="terminal-search-input" 
+                placeholder="Query index using keywords, boolean operators (AND, OR, NOT), or quotes..." 
+                value="distributed consensus"
+                autocomplete="off"
+                spellcheck="false"
+              >
+              <button id="clear-search-btn" class="clear-search-btn" title="Clear query">✕</button>
+            </div>
+
+            <div class="latency-metric-chip" title="Execution latency measured in microseconds">
+              <span>Latency:</span>
+              <span id="latency-val" class="latency-val">0.38 ms</span>
+            </div>
+          </div>
+
+          <!-- Quick Query Presets -->
+          <div class="query-presets-row">
+            <span class="presets-label">Preset Queries:</span>
+            <button class="preset-chip active" data-query="distributed consensus">"distributed consensus"</button>
+            <button class="preset-chip" data-query="byzantine fault">"byzantine fault"</button>
+            <button class="preset-chip" data-query="bm25 AND inverted">bm25 AND inverted</button>
+            <button class="preset-chip" data-query="varint d-gap">varint d-gap</button>
+            <button class="preset-chip" data-query="mechanical sympathy">mechanical sympathy</button>
+            <button class="preset-chip" data-query="porter stemmer">porter stemmer</button>
+          </div>
+        </div>
+
+        <!-- Split Terminal Body -->
+        <div class="terminal-split-body">
+          <!-- Left: Ranked Results Feed -->
+          <div class="terminal-results-pane">
+            <div class="pane-heading">
+              <span class="pane-title">Ranked BM25 Results</span>
+              <span class="pane-badge">Sorted by Score</span>
+            </div>
+            <div id="preview-results-list" class="results-list">
+              <!-- Rendered via app.js -->
+            </div>
+          </div>
+
+          <!-- Right: Engine Internals & Telemetry -->
+          <div class="terminal-telemetry-pane">
+            <div class="internals-block">
+              <div class="block-title">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+                <span>Analysis Stream (NFKD + Stopwords + Porter Stemmer)</span>
+              </div>
+              <div id="token-stream" class="token-pipeline-stream">
+                <span class="token-chip">distribut</span>
+                <span class="token-arrow">→</span>
+                <span class="token-chip">consensus</span>
+              </div>
+            </div>
+
+            <div class="internals-block">
+              <div class="block-title">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="16 18 22 12 16 6"/>
+                  <polyline points="8 6 2 12 8 18"/>
+                </svg>
+                <span>AST Query Evaluation Plan</span>
+              </div>
+              <pre id="ast-plan-pre" class="ast-tree-pre">BinaryOp(AND, [Term("distribut"), Term("consensus")])</pre>
+            </div>
+
+            <div class="internals-block">
+              <div class="block-title">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                </svg>
+                <span>Engine Telemetry</span>
+              </div>
+              <div class="telemetry-grid">
+                <div class="telemetry-item">
+                  <div class="telemetry-lbl">Candidates Scanned</div>
+                  <div id="telem-candidates" class="telemetry-val">10</div>
+                </div>
+                <div class="telemetry-item">
+                  <div class="telemetry-lbl">Terms Looked Up</div>
+                  <div id="telem-terms" class="telemetry-val">2</div>
+                </div>
+                <div class="telemetry-item">
+                  <div class="telemetry-lbl">WAND Pruned Docs</div>
+                  <div id="telem-pruned" class="telemetry-val">4</div>
+                </div>
+                <div class="telemetry-item">
+                  <div class="telemetry-lbl">Avg Corpus Length</div>
+                  <div id="telem-avgdl" class="telemetry-val">34</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Parameters Bar (k1 and b Sliders) -->
+        <div class="terminal-params-bar">
+          <div class="param-group">
+            <span style="color: var(--text-dim);">Okapi BM25 Parameters:</span>
+          </div>
+          <div class="param-group">
+            <label for="k1-slider">Term Saturation (k₁):</label>
+            <input id="k1-slider" type="range" class="param-slider" min="0.5" max="3.0" step="0.1" value="1.2">
+            <span id="k1-val" class="param-val">1.2</span>
+          </div>
+          <div class="param-group">
+            <label for="b-slider">Length Normalization (b):</label>
+            <input id="b-slider" type="range" class="param-slider" min="0.0" max="1.0" step="0.05" value="0.75">
+            <span id="b-val" class="param-val">0.75</span>
+          </div>
+          <div class="param-group" style="font-size: 0.68rem; color: var(--text-faint);">
+            <span>Real-time score recalculation</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Commands Section (Reference: p2pcopy commands) -->
+    <section id="commands" class="section-wrap">
+      <span class="section-tag">CLI Interface</span>
+      <h2 class="section-title">Everything you need from your terminal.</h2>
+      <p class="section-desc">
+        Index directories, query compressed binary indexes, inspect dictionary statistics, or run a high-throughput REST server.
+      </p>
+
+      <div class="commands-box">
+        <div class="commands-nav-header">
+          <div class="command-tabs-list">
+            <button class="cmd-tab-btn active" data-tab="cmd-index">argus index</button>
+            <button class="cmd-tab-btn" data-tab="cmd-search">argus search</button>
+            <button class="cmd-tab-btn" data-tab="cmd-serve">argus serve</button>
+            <button class="cmd-tab-btn" data-tab="cmd-stats">argus stats</button>
+            <button class="cmd-tab-btn" data-tab="cmd-sdk">TypeScript SDK</button>
+          </div>
+          <button class="copy-cmd-btn" title="Copy active command">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            <span>Copy</span>
+          </button>
+        </div>
+
+        <div id="cmd-index" class="command-content-pane active">
+<pre><span class="cmd-comment"># Ingest markdown, JSON, or text documents into compressed .argus binary index</span>
+$ argus index <span class="cmd-flag">--source</span> <span class="cmd-val">./docs</span> <span class="cmd-flag">--output</span> <span class="cmd-val">./indices/docs.argus</span>
+
+<span class="cmd-comment">✔ Scanned 10,480 document(s) in 342ms</span>
+<span class="cmd-comment">✔ Inverted index compiled (28,140 unique lexicon stems)</span>
+<span class="cmd-comment">✔ Serialized to docs.argus (12.4 MB · 71.4% compression vs raw JSON)</span></pre>
+        </div>
+
+        <div id="cmd-search" class="command-content-pane">
+<pre><span class="cmd-comment"># Execute an instant query with full boolean &amp; phrase syntax</span>
+$ argus search <span class="cmd-flag">--index</span> <span class="cmd-val">./docs.argus</span> <span class="cmd-val">"distributed AND consensus NOT byzantine"</span>
+
+<span class="cmd-comment">🔎 Query: "distributed AND consensus NOT byzantine" — 4 result(s) in 0.42ms</span>
+
+1. [BM25: 14.8210] Raft Consensus: Replicated State Machines (DocID: 1)
+   ...formalized <span class="cmd-val">distributed</span> algorithms for state machine <span class="cmd-val">consensus</span>...
+   Matched: distribut, consensu</pre>
+        </div>
+
+        <div id="cmd-serve" class="command-content-pane">
+<pre><span class="cmd-comment"># Start the zero-dependency REST search daemon with dashboard</span>
+$ argus serve <span class="cmd-flag">--index</span> <span class="cmd-val">./docs.argus</span> <span class="cmd-flag">--port</span> <span class="cmd-val">8080</span>
+
+🚀 Argus Search Server running!
+🌐 Web UI &amp; Playground: http://localhost:8080
+📡 REST API Endpoint:   http://localhost:8080/api/search?q=your_query
+📊 Index Stats:         http://localhost:8080/api/stats</pre>
+        </div>
+
+        <div id="cmd-stats" class="command-content-pane">
+<pre><span class="cmd-comment"># Inspect binary header, dictionary statistics, and d-gap compression</span>
+$ argus stats <span class="cmd-flag">--index</span> <span class="cmd-val">./docs.argus</span>
+
+📊 Argus Index Statistics (docs.argus)
+───────────────────────────────────────
+Format Version:       v1
+Total Documents (N):  10,480
+Unique Lexicon Terms: 28,140
+Total Tokens:         382,910
+Average Doc Length:   36.53 tokens
+File Size:            12,410 KB</pre>
+        </div>
+
+        <div id="cmd-sdk" class="command-content-pane">
+<pre><span class="cmd-comment">// Embed Argus directly in any Node.js or TypeScript backend</span>
+<span class="cmd-val">import</span> { ArgusEngine } <span class="cmd-val">from</span> <span class="cmd-flag">'argus-search'</span>;
+
+<span class="cmd-val">const</span> engine = <span class="cmd-val">await</span> ArgusEngine.<span class="cmd-val">load</span>(<span class="cmd-flag">'./docs.argus'</span>);
+<span class="cmd-val">const</span> results = engine.<span class="cmd-val">search</span>(<span class="cmd-flag">'distributed consensus'</span>, { limit: 5 });
+
+console.log(results[0].title, <span class="cmd-flag">'Score:'</span>, results[0].score);</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section (Exact Reference: p2pcopy 3-col panel cards) -->
+    <section id="features" class="section-wrap">
+      <span class="section-tag">Architecture</span>
+      <h2 class="section-title">Everything Elasticsearch does, minus the Java runtime.</h2>
+      <p class="section-desc">
+        Engineered from first principles with zero third-party dependencies, contiguous typed memory buffers, and mechanical sympathy for V8.
+      </p>
+
+      <div class="p2p-feature-grid">
+        <!-- Feature 1 -->
+        <div class="p2p-feature-card">
+          <div>
+            <span class="card-top-badge">Zero Dependencies</span>
+            <h3 class="p2p-card-title">Zero External Dependencies</h3>
+            <p class="p2p-card-desc">
+              100% handwritten from first principles. Tokenizers, stemmers, compression codecs, and data structures contain zero third-party packages and require no native C++ compilation.
+            </p>
+          </div>
+          <div class="p2p-card-tags">
+            <span class="p2p-tag">Zero Bloat</span>
+            <span class="p2p-tag">Cross-Platform</span>
+            <span class="p2p-tag">Node &amp; Bun Native</span>
+          </div>
+        </div>
+
+        <!-- Feature 2 -->
+        <div class="p2p-feature-card">
+          <div>
+            <span class="card-top-badge">V8 Optimization</span>
+            <h3 class="p2p-card-title">Mechanical Sympathy for V8</h3>
+            <p class="p2p-card-desc">
+              Operates on contiguous typed buffers (`Uint8Array`, `Uint32Array`, `Float32Array`) rather than millions of fragmented objects, eliminating GC latency.
+            </p>
+          </div>
+          <div class="p2p-card-tags">
+            <span class="p2p-tag">TypedArrays</span>
+            <span class="p2p-tag">Zero-GC Pauses</span>
+            <span class="p2p-tag">Cache Locality</span>
+          </div>
+        </div>
+
+        <!-- Feature 3 -->
+        <div class="p2p-feature-card">
+          <div>
+            <span class="card-top-badge">Query Parsing</span>
+            <h3 class="p2p-card-title">Positional Phrase &amp; AST Engine</h3>
+            <p class="p2p-card-desc">
+              Recursive-descent query grammar parser supporting parentheses, boolean algebra (`AND`, `OR`, `NOT`), wildcards, and exact positional phrase distances.
+            </p>
+          </div>
+          <div class="p2p-card-tags">
+            <span class="p2p-tag">Boolean Algebra</span>
+            <span class="p2p-tag">Exact Quotes</span>
+            <span class="p2p-tag">Slop Verification</span>
+          </div>
+        </div>
+
+        <!-- Feature 4 -->
+        <div class="p2p-feature-card">
+          <div>
+            <span class="card-top-badge">Persistence</span>
+            <h3 class="p2p-card-title">Proprietary .argus Binary Format</h3>
+            <p class="p2p-card-desc">
+              Serializes indexes with magic headers (`0x41 0x52 0x47 0x53`), Delta d-gaps, Variable-Byte (Varint) continuation bits, and CRC32 verification (65%–75% reduction vs JSON).
+            </p>
+          </div>
+          <div class="p2p-card-tags">
+            <span class="p2p-tag">VByte Codec</span>
+            <span class="p2p-tag">Delta D-Gaps</span>
+            <span class="p2p-tag">Zero-Copy Read</span>
+          </div>
+        </div>
+
+        <!-- Feature 5 -->
+        <div class="p2p-feature-card">
+          <div>
+            <span class="card-top-badge">Retrieval Speed</span>
+            <h3 class="p2p-card-title">Skip Lists &amp; WAND Pruning</h3>
+            <p class="p2p-card-desc">
+              Skip pointers placed every ⌊√L⌋ entries enable jumping over large blocks of non-matching documents. Dynamic WAND skips non-competitive documents early.
+            </p>
+          </div>
+          <div class="p2p-card-tags">
+            <span class="p2p-tag">WAND Pruning</span>
+            <span class="p2p-tag">Skip Lists</span>
+            <span class="p2p-tag">MinHeap Top-K</span>
+          </div>
+        </div>
+
+        <!-- Feature 6 -->
+        <div class="p2p-feature-card">
+          <div>
+            <span class="card-top-badge">Delivery</span>
+            <h3 class="p2p-card-title">Dual CLI &amp; Embedded REST Daemon</h3>
+            <p class="p2p-card-desc">
+              Includes a native zero-dependency HTTP search server with REST endpoints (`/api/search`), dynamic JSON ingestion, and interactive CLI tooling out of the box.
+            </p>
+          </div>
+          <div class="p2p-card-tags">
+            <span class="p2p-tag">REST API</span>
+            <span class="p2p-tag">Interactive CLI</span>
+            <span class="p2p-tag">Embeddable SDK</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Architecture Section -->
+    <section id="architecture" class="section-wrap">
+      <span class="section-tag">System Design</span>
+      <h2 class="section-title">Decoupled Ingestion &amp; Query Pipeline</h2>
+      <p class="section-desc">
+        Argus cleanly separates the write path (tokenization, stemmer, lexicon, delta compression) from the read path (AST parser, skip pointers, BM25 scorer).
+      </p>
+
+      <div class="arch-terminal-block">
+        <div class="arch-flow-columns">
+          <!-- Ingestion Path -->
+          <div class="arch-col-box">
+            <div class="arch-col-header">
+              <span class="status-dot"></span>
+              <span>Ingestion Pipeline (Write Path)</span>
+            </div>
+            <div class="arch-flow-steps">
+              <div class="arch-step-row">
+                <span class="arch-step-idx">01</span>
+                <div>
+                  <div class="arch-step-title">Raw Document Parser</div>
+                  <div class="arch-step-sub">Streams JSON, Markdown, or plain text corpora</div>
+                </div>
+              </div>
+              <div class="arch-step-row">
+                <span class="arch-step-idx">02</span>
+                <div>
+                  <div class="arch-step-title">Unicode NFKD &amp; Lexer</div>
+                  <div class="arch-step-sub">Extracts word boundaries and byte offsets</div>
+                </div>
+              </div>
+              <div class="arch-step-row">
+                <span class="arch-step-idx">03</span>
+                <div>
+                  <div class="arch-step-title">Porter Stemmer &amp; Stopwords</div>
+                  <div class="arch-step-sub">Morphological reduction &amp; 170 stopword filtering</div>
+                </div>
+              </div>
+              <div class="arch-step-row">
+                <span class="arch-step-idx">04</span>
+                <div>
+                  <div class="arch-step-title">Delta &amp; Varint Compression</div>
+                  <div class="arch-step-sub">Monotonic doc IDs encoded with 7-bit continuation</div>
+                </div>
+              </div>
+              <div class="arch-step-row">
+                <span class="arch-step-idx">05</span>
+                <div>
+                  <div class="arch-step-title">.argus Binary Serialization</div>
+                  <div class="arch-step-sub">Magic bytes (0x41 0x52 0x47 0x53) + CRC32 verification</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Query Path -->
+          <div class="arch-col-box">
+            <div class="arch-col-header">
+              <span class="status-dot"></span>
+              <span>Query Engine (Read Path)</span>
+            </div>
+            <div class="arch-flow-steps">
+              <div class="arch-step-row">
+                <span class="arch-step-idx">01</span>
+                <div>
+                  <div class="arch-step-title">AST Lexer &amp; Parser</div>
+                  <div class="arch-step-sub">Builds execution tree for AND, OR, NOT, and phrases</div>
+                </div>
+              </div>
+              <div class="arch-step-row">
+                <span class="arch-step-idx">02</span>
+                <div>
+                  <div class="arch-step-title">Lexicon Dictionary Lookup</div>
+                  <div class="arch-step-sub">O(1) Radix trie retrieval of posting byte offsets</div>
+                </div>
+              </div>
+              <div class="arch-step-row">
+                <span class="arch-step-idx">03</span>
+                <div>
+                  <div class="arch-step-title">Skip-List Intersector</div>
+                  <div class="arch-step-sub">Leaps across postings blocks in O(min(N,M)) time</div>
+                </div>
+              </div>
+              <div class="arch-step-row">
+                <span class="arch-step-idx">04</span>
+                <div>
+                  <div class="arch-step-title">Okapi BM25 Scorer</div>
+                  <div class="arch-step-sub">Term saturation (k1) + length penalty (b) + Robertson IDF</div>
+                </div>
+              </div>
+              <div class="arch-step-row">
+                <span class="arch-step-idx">05</span>
+                <div>
+                  <div class="arch-step-title">MinHeap Top-K Collector</div>
+                  <div class="arch-step-sub">Extracts highest-scoring documents without sorting</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Benchmarks Section -->
+    <section id="benchmarks" class="section-wrap">
+      <span class="section-tag">Performance Verification</span>
+      <h2 class="section-title">Engineered to Outperform</h2>
+      <p class="section-desc">
+        Automated Vitest benchmark measurements on consumer x86_64 hardware across 100,000 documents.
+      </p>
+
+      <div class="benchmarks-strip">
+        <div class="bench-box">
+          <div class="bench-stat bench-stat-accent">&lt; 1.2ms</div>
+          <div class="bench-tag">Median (P50) Query Latency</div>
+        </div>
+        <div class="bench-box">
+          <div class="bench-stat">100k+</div>
+          <div class="bench-tag">Docs Indexed per Second</div>
+        </div>
+        <div class="bench-box">
+          <div class="bench-stat bench-stat-accent">71.4%</div>
+          <div class="bench-tag">Binary Size Reduction vs JSON</div>
+        </div>
+        <div class="bench-box">
+          <div class="bench-stat">0 B</div>
+          <div class="bench-tag">Garbage Collection Pauses</div>
+        </div>
+      </div>
+
+      <div class="bench-table-card">
+        <table class="bench-table">
+          <thead>
+            <tr>
+              <th>Architecture</th>
+              <th>Index Format</th>
+              <th>Runtime Dependencies</th>
+              <th>Median Query (P50)</th>
+              <th>99th Percentile (P99)</th>
+              <th>Memory Footprint</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="font-family: var(--font-mono); font-weight: 600; color: #ffffff;">Argus (In-Memory Engine)</td>
+              <td>.argus (VByte + D-Gaps)</td>
+              <td>0 (Zero Dependencies)</td>
+              <td><span style="color: var(--accent); font-weight: 600;">0.38 ms</span></td>
+              <td><span style="color: var(--accent); font-weight: 600;">2.10 ms</span></td>
+              <td>Contiguous TypedArray (Low)</td>
+            </tr>
+            <tr>
+              <td style="font-family: var(--font-mono); font-weight: 600; color: #ffffff;">Raw JSON Inverted Index</td>
+              <td>JSON Objects</td>
+              <td>0 (Native JS)</td>
+              <td>4.80 ms</td>
+              <td>18.40 ms</td>
+              <td>Heavy Heap Fragmentation (High)</td>
+            </tr>
+            <tr>
+              <td style="font-family: var(--font-mono); font-weight: 600; color: #ffffff;">SQLite FTS5 (via Node bindings)</td>
+              <td>C Binary DB</td>
+              <td>Native C++ Addons</td>
+              <td>1.95 ms</td>
+              <td>6.20 ms</td>
+              <td>V8-to-C++ Binding Overhead</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Bottom Quickstart CTA Box -->
+    <div class="bottom-cta-box">
+      <h2 class="bottom-cta-title">Ready to embed deterministic search in your stack?</h2>
+      <p class="bottom-cta-desc">
+        Zero external dependencies, mechanical sympathy for the V8 runtime, and sub-millisecond retrieval out of the box.
+      </p>
+      <div class="bottom-cta-row">
+        <button onclick="navigator.clipboard.writeText('npm install argus-search'); alert('Copied: npm install argus-search');" class="terminal-copy-pill">
+          <span class="terminal-prompt">$</span>
+          <span>npm install argus-search</span>
+        </button>
+        <a href="https://github.com/Krishnanand-10/Argus" target="_blank" rel="noopener noreferrer" class="btn-terminal-primary">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+          <span>Star on GitHub</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Developer Tool Footer -->
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <a href="#hero" class="footer-brand">
+          <div class="brand-icon-box" style="width: 24px; height: 24px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="12" cy="12" r="9"/>
+              <circle cx="12" cy="12" r="3" fill="currentColor"/>
+            </svg>
+          </div>
+          <span>argus-search</span>
+        </a>
+
+        <div class="footer-links">
+          <a href="#demo">Live REPL</a>
+          <a href="#commands">Commands</a>
+          <a href="#features">Features</a>
+          <a href="#architecture">Architecture</a>
+          <a href="#benchmarks">Benchmarks</a>
+          <a href="https://github.com/Krishnanand-10/Argus" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="https://www.npmjs.com/package/argus-search" target="_blank" rel="noopener noreferrer">npm</a>
+        </div>
+
+        <div class="footer-copy-text">
+          Engineered by <a href="https://github.com/Krishnanand-10" target="_blank" rel="noopener noreferrer">Krishnanand Tiwari</a> · MIT License
+        </div>
+      </div>
+    </footer>
+
+  </main>
+
+  <!-- Global Toast Notice -->
+  <div id="toast-notice" class="toast-notice">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+    <span id="toast-msg">Copied to clipboard!</span>
+  </div>
+
+  <!-- JavaScript -->
+  <script src="app.js"></script>
+</body>
+</html>

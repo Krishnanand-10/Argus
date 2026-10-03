@@ -1,7 +1,7 @@
 {
   "name": "argus-search",
   "version": "0.1.0",
-  "description": "A high-performance, zero-dependency full-text search engine engineered from first principles in pure TypeScript.",
+  "description": "Full-text search at in-memory speed. Zero dependencies.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -11,6 +11,9 @@
   "files": [
     "dist",
     "bin",
+    "index.html",
+    "styles.css",
+    "app.js",
     "README.md",
     "LICENSE"
   ],
