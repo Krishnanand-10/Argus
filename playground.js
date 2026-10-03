@@ -344,17 +344,29 @@ function extractReadableDocument(rawContent, filename = "") {
         for (const child of element.childNodes) {
           if (child.nodeType === Node.TEXT_NODE) {
             const val = child.nodeValue.replace(/[\r\n\t]+/g, " ");
-            if (val.trim()) out += val;
+            if (val.trim()) {
+              out += (out.length > 0 && !out.endsWith("\n") && !out.endsWith(" ") ? " " : "") + val.trim();
+            }
           } else if (child.nodeType === Node.ELEMENT_NODE) {
             const tag = child.tagName.toLowerCase();
+            if (tag === "br") {
+              out += "\n";
+              continue;
+            }
+            if (tag === "hr") {
+              out += "\n\n---\n\n";
+              continue;
+            }
+
             const isHeading = /^h[1-6]$/.test(tag);
             const isSection = tag === "section" || (child.classList && child.classList.contains("slide"));
-            const isBlock = /^(p|div|section|article|li|ol|ul|tr|table|header|footer|blockquote|main)$/.test(tag);
+            const isBlock = /^(p|div|section|article|li|ol|ul|tr|table|header|footer|blockquote|main|dd|dt)$/.test(tag);
+            const isCell = tag === "td" || tag === "th";
 
-            if (isSection) out += "\n\n### ";
-            else if (isHeading) out += "\n\n### ";
+            if (isSection || isHeading) out += "\n\n### ";
             else if (tag === "li") out += "\n• ";
-            else if (isBlock) out += "\n";
+            else if (isBlock) out += "\n\n";
+            else if (isCell) out += " | ";
 
             out += extractBlocks(child);
 
@@ -1990,8 +2002,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const line = rawLine.trim();
       if (!line) continue;
 
-      if (line.startsWith("### ")) {
-        currentSection = line.replace(/^###\s+/, "");
+      if (/^#{1,6}\s+/.test(line)) {
+        currentSection = line.replace(/^#{1,6}\s+/, "");
         continue;
       }
 
@@ -1999,10 +2011,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const hasMatch = words.some(w => (stems && stems.includes(PorterStemmer(w))) || (queryWords && queryWords.includes(w)));
 
       if (hasMatch) {
-        const highlighted = highlightTermsInText(line.replace(/^•\s+/, ""), stems, queryWords);
+        const isBullet = line.startsWith("• ") || /^[-*+]\s+/.test(line);
+        const cleanLine = line.replace(/^(•|[-*+])\s+/, "");
+        const highlighted = highlightTermsInText(cleanLine, stems, queryWords);
         matchedBlocks.push({
           section: currentSection,
-          isBullet: line.startsWith("• "),
+          isBullet: isBullet,
           html: highlighted
         });
       }
@@ -2049,6 +2063,13 @@ document.addEventListener("DOMContentLoaded", () => {
     let html = "";
     let inList = false;
 
+    function inlineFormat(str) {
+      let highlighted = highlightTermsInText(str, stems, queryWords);
+      highlighted = highlighted.replace(/`([^`]+)`/g, '<code style="background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 4px; font-family: var(--font-mono); font-size: 0.85em; color: var(--accent);">$1</code>');
+      highlighted = highlighted.replace(/\*\*([^*]+)\*\*/g, '<strong style="color: #ffffff;">$1</strong>');
+      return highlighted;
+    }
+
     for (let rawLine of lines) {
       const line = rawLine.trim();
       if (!line) {
@@ -2056,18 +2077,23 @@ document.addEventListener("DOMContentLoaded", () => {
         continue;
       }
 
-      if (line.startsWith("### ")) {
+      if (line === "---" || line === "***") {
         if (inList) { html += "</ul>"; inList = false; }
-        const hText = highlightTermsInText(line.replace(/^###\s+/, ""), stems, queryWords);
-        html += `<h4 class="modal-content-h4">${hText}</h4>`;
-      } else if (line.startsWith("• ")) {
-        if (!inList) { html += '<ul class="modal-content-list">'; inList = true; }
-        const liText = highlightTermsInText(line.replace(/^•\s+/, ""), stems, queryWords);
-        html += `<li>${liText}</li>`;
+        html += '<hr style="border: none; border-top: 1px solid var(--border-subtle); margin: 20px 0;">';
+      } else if (/^#{1,6}\s+/.test(line)) {
+        if (inList) { html += "</ul>"; inList = false; }
+        const level = line.match(/^#{1,6}/)[0].length;
+        const hText = inlineFormat(line.replace(/^#{1,6}\s+/, ""));
+        const fontSize = level === 1 ? "1.25rem" : level === 2 ? "1.1rem" : "0.95rem";
+        html += `<h4 class="modal-content-h4" style="font-size: ${fontSize}; margin-top: 20px; margin-bottom: 8px;">${hText}</h4>`;
+      } else if (line.startsWith("• ") || /^[-*+]\s+/.test(line)) {
+        if (!inList) { html += '<ul class="modal-content-list" style="margin-bottom: 12px;">'; inList = true; }
+        const liText = inlineFormat(line.replace(/^(•|[-*+])\s+/, ""));
+        html += `<li style="margin-bottom: 4px;">${liText}</li>`;
       } else {
         if (inList) { html += "</ul>"; inList = false; }
-        const pText = highlightTermsInText(line, stems, queryWords);
-        html += `<p class="modal-content-p">${pText}</p>`;
+        const pText = inlineFormat(line);
+        html += `<p class="modal-content-p" style="margin-bottom: 12px; line-height: 1.6;">${pText}</p>`;
       }
     }
 

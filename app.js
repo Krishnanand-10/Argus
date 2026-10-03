@@ -386,16 +386,29 @@ function extractReadableDocument(rawContent, filename = "") {
         for (const child of element.childNodes) {
           if (child.nodeType === Node.TEXT_NODE) {
             const val = child.nodeValue.replace(/[\r\n\t]+/g, " ");
-            if (val.trim()) out += val;
+            if (val.trim()) {
+              out += (out.length > 0 && !out.endsWith("\n") && !out.endsWith(" ") ? " " : "") + val.trim();
+            }
           } else if (child.nodeType === Node.ELEMENT_NODE) {
             const tag = child.tagName.toLowerCase();
+            if (tag === "br") {
+              out += "\n";
+              continue;
+            }
+            if (tag === "hr") {
+              out += "\n\n---\n\n";
+              continue;
+            }
+
             const isHeading = /^h[1-6]$/.test(tag);
             const isSection = tag === "section" || (child.classList && child.classList.contains("slide"));
-            const isBlock = /^(p|div|section|article|li|ol|ul|tr|table|header|footer|blockquote|main)$/.test(tag);
+            const isBlock = /^(p|div|section|article|li|ol|ul|tr|table|header|footer|blockquote|main|dd|dt)$/.test(tag);
+            const isCell = tag === "td" || tag === "th";
 
             if (isSection || isHeading) out += "\n\n### ";
             else if (tag === "li") out += "\n• ";
-            else if (isBlock) out += "\n";
+            else if (isBlock) out += "\n\n";
+            else if (isCell) out += " | ";
 
             out += extractBlocks(child);
 
