@@ -275,6 +275,12 @@ body {
   background: rgba(203, 56, 55, 0.12);
 }
 
+.btn-header-icon.btn-vercel:hover {
+  border-color: #ffffff;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
 /* ==========================================================================
    Hero Section (Reference: p2pcopy hero)
    ========================================================================== */
