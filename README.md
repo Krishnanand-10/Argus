@@ -1,5 +1,6 @@
 # 🚀 Argus — High-Performance Full-Text Search Engine
 
+[![npm version](https://img.shields.io/npm/v/argus-search.svg?style=for-the-badge&logo=npm)](https://www.npmjs.com/package/argus-search)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?style=for-the-badge&logo=node.js)](https://nodejs.org/)
 [![Bun](https://img.shields.io/badge/Bun-1.1%2B-f472b6?style=for-the-badge&logo=bun)](https://bun.sh/)
@@ -196,11 +197,22 @@ flowchart TB
 
 ## 🚀 Getting Started
 
-### 1. Prerequisites
+### ⚡ Quick Install via npm
+```bash
+# As a library dependency
+npm install argus-search
+
+# Or run CLI directly via npx
+npx argus-search --help
+```
+
+### 🛠️ Building From Source
+
+#### 1. Prerequisites
 - **Node.js** `>= 20.0.0` or **Bun** `>= 1.1.0`
 - **npm**, **pnpm**, or **bun**
 
-### 2. Clone the Repository
+#### 2. Clone the Repository
 ```bash
 git clone https://github.com/Krishnanand-10/Argus.git
 cd Argus
