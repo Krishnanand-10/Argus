@@ -355,31 +355,6 @@ Argus/
 
 ---
 
-## 🗺️ Build Plan & Roadmap
-
-- [x] **Phase 1: Architecture & Design Specification**
-  - [x] Architectural documentation & binary format specification
-  - [x] Character normalization & Unicode word tokenizer
-  - [x] Porter Stemming algorithm & stopword filter
-- [x] **Phase 2: Inverted Index & Positional Postings**
-  - [x] Term Dictionary (Trie / Radix Tree)
-  - [x] Positional postings list with Term Frequency and offsets
-  - [x] Skip lists for accelerated list intersections
-- [x] **Phase 3: Binary Storage & Compression**
-  - [x] Variable-Byte (Varint) codec with bitwise operations
-  - [x] Delta encoding (d-gaps) for DocIDs and positions
-  - [x] Custom `.argus` binary serializer and zero-copy reader
-- [x] **Phase 4: Relevance Scoring & Query Engine**
-  - [x] Okapi BM25 scoring with $k_1$ and $b$ parameter tuning
-  - [x] Binary MinHeap Priority Queue for top-$K$ selection
-  - [x] Recursive-descent AST query parser (Boolean, Phrase, Prefix)
-  - [x] WAND (Weak AND) dynamic query pruning
-- [x] **Phase 5: CLI, REST Server & Benchmarks**
-  - [x] Interactive CLI utility (`index`, `search`, `stats`, `serve`)
-  - [x] Vitest test suite with 95%+ coverage & throughput benchmarks
-
----
-
 ## 🧪 Running Tests
 
 Argus uses **Vitest** for fast unit, integration, and property-based test suites:
